@@ -1,0 +1,18 @@
+# Code owners: GitHub automatically requests a review from the owner of each touched path.
+#
+# 1. "Require review from Code Owners" is OFF in the `main` ruleset. Each area has a single
+#    owner and GitHub never lets authors approve their own PR, so with it on an owner's PR
+#    in their own area could never merge. This file is kept only for automatic review requests.
+# 2. CODEOWNERS cannot require approval from everyone: when a line lists several people, ONE
+#    approval satisfies it. "All three members approve changes to docs/PROTOCOL.md and the
+#    §8.3 module contracts" is a team rule (CONTRIBUTING.md), not enforced by this file.
+
+/src/meshsync/protocol/   @Muhammad-Ahmed-Qazi
+/src/meshsync/net/        @Muhammad-Ahmed-Qazi
+/src/meshsync/__main__.py @Muhammad-Ahmed-Qazi
+/src/meshsync/config.py   @Muhammad-Ahmed-Qazi
+/src/meshsync/sync/       @MujtabaJRao
+/src/meshsync/transfer/   @Huzaifa-Hanif-01
+/src/meshsync/metrics/    @Huzaifa-Hanif-01
+/scripts/measure/         @Huzaifa-Hanif-01
+/docs/PROTOCOL.md         @Muhammad-Ahmed-Qazi @MujtabaJRao @Huzaifa-Hanif-01
