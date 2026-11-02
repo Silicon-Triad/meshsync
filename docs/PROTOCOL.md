@@ -1,3 +1,5 @@
+<!-- FROZEN INTERFACE (AGENTS.md §6): any change or addition needs an issue and approval from all three members first (R-6.2). -->
+
 # meshsync Protocol Specification (version 1)
 
 This document specifies the meshsync wire protocol completely enough for an independent

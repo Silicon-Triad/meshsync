@@ -1,3 +1,5 @@
+# FROZEN INTERFACE (AGENTS.md §6): changing or adding to the public interface in this file
+# needs an issue and approval from all three members first (R-6.2).
 """Sync engine: compare entries, conflicts, tombstones.
 
 Owner: Mujtaba Jawaid Rao (CS-24047)

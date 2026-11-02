@@ -1,3 +1,5 @@
+# FROZEN INTERFACE (AGENTS.md §6): changing or adding to the public interface in this file
+# needs an issue and approval from all three members first (R-6.2).
 """Connection: one authenticated TCP link to one peer.
 
 Owner: Muhammad Ahmed Qazi (CS-24045)
