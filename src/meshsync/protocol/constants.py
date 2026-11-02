@@ -1,3 +1,5 @@
+# FROZEN INTERFACE (AGENTS.md §6): changing or adding to the public interface in this file
+# needs an issue and approval from all three members first (R-6.2).
 """Protocol constants: ports, limits, timers, message types and error codes.
 
 Single home for every value from PROJECT_CONTEXT.md §6 and §7. Nothing else may hard-code these.

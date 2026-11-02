@@ -1,24 +1,37 @@
-## What changed
-
-<!-- One concern per PR. List the files/modules touched and why. -->
+## Issue
 
 Closes #
 
+## Requirement IDs
+
+<!-- e.g. D4, §6.5, R7. PR title format: <type>(<area>): <summary> [<IDs>] (AGENTS.md R-5.2) -->
+
+## What changed
+
+<!-- Files/modules touched and why. Over ~400 lines? Explain the size (R-7.2). -->
+
 ## How tested
 
-<!-- Commands run (pytest, ruff, manual multi-peer run) and their results. -->
+<!-- Commands run (scripts/check.sh, manual multi-peer run) and results. List anything not run. -->
 
-## Protocol impact
+## Frozen-interface impact
 
-- [ ] `docs/PROTOCOL.md` updated in this PR
-- [ ] N/A (no change to wire format, message types, error codes or state machine)
-- [ ] All three members approved (required for `docs/PROTOCOL.md` / §8.3 contract changes)
+- [ ] None
+- [ ] Changes a frozen interface (AGENTS.md §6): approval from all three members linked here:
 
-## AI use
+## AI assistance
 
-- [ ] Logged in `docs/AI_USE_LOG.md`
-- [ ] N/A
+- [ ] None
+- [ ] Used. Tool and model: <!-- e.g. Claude Code, <model> -->; logged in `docs/AI_USE_LOG.md`
 
-## Reviewer
+## Done checklist (AGENTS.md §9)
 
-<!-- Must be a different member from the author (PROJECT_CONTEXT.md §9.2). -->
+- [ ] Linked to exactly one issue (`Closes #N`); stays within it.
+- [ ] `scripts/check.sh` passes locally; CI green.
+- [ ] Tests added/updated for the change.
+- [ ] Requirement IDs cited in PR title, commits and code comments.
+- [ ] No frozen interface changed, or all-member approval linked.
+- [ ] `docs/PROTOCOL.md` updated if the protocol changed.
+- [ ] No secrets, certs, keys or personal test data committed.
+- [ ] AI use logged in `docs/AI_USE_LOG.md` (tool and model), or none.
+- [ ] Author can explain every line.

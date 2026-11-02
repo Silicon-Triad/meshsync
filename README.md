@@ -31,7 +31,8 @@ ruff format --check .
 - [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md): single source of truth (decisions, plan, conventions)
 - [`docs/PROTOCOL.md`](docs/PROTOCOL.md): protocol specification
 - [`docs/AI_USE_LOG.md`](docs/AI_USE_LOG.md): AI use log
-- [`CONTRIBUTING.md`](CONTRIBUTING.md): branches, commits, reviews, merging
+- [`AGENTS.md`](AGENTS.md): rulebook for humans and AI agents (`CLAUDE.md` imports it)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): quick start for contributors
 - [`docs/setup/github.md`](docs/setup/github.md): GitHub repository settings
 
 ## Team
