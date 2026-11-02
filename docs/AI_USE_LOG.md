@@ -4,3 +4,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 
 | Date | Member | Tool | Used for | Kept / changed |
 | ---- | ------ | ---- | -------- | -------------- |
+| 2026-11-02 | Muhammad Ahmed Qazi | Claude Code | Repository scaffold from the scaffold brief: pyproject, CI, PR template, PROTOCOL.md, constants.py, framing.py + unit tests, module stubs, CLI skeleton, gen_certs.sh | Kept as generated; to be reviewed line by line by another member before merge (PR #27) |
