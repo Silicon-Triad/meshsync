@@ -15,6 +15,7 @@ import hmac
 import logging
 import secrets
 import socket
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -110,9 +111,25 @@ def _send_error(sock: socket.socket, err: ProtocolError) -> None:
 
 
 def _run(sock: socket.socket, role: str, steps: Callable[[], PeerIdentity]) -> PeerIdentity:
-    """Run steps() under HANDSHAKE_TIMEOUT; log and report failures; restore the old timeout."""
+    """Run steps() within HANDSHAKE_TIMEOUT in total; log and report failures.
+
+    §6.5: the WHOLE handshake must finish within 10 s. sock.settimeout alone limits each recv
+    separately, so a slow peer could stretch the handshake (e.g. one byte every 9 s). A watchdog
+    timer therefore shuts the socket down at the deadline; any blocked recv/send then fails.
+    """
+    expired = threading.Event()
+
+    def on_deadline() -> None:
+        expired.set()
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+        except OSError as e:  # already closed
+            log.debug("watchdog shutdown: %s", e)
+
+    watchdog = threading.Timer(HANDSHAKE_TIMEOUT, on_deadline)
     previous = sock.gettimeout()
-    sock.settimeout(HANDSHAKE_TIMEOUT)  # §6.5: whole handshake within 10 s
+    sock.settimeout(HANDSHAKE_TIMEOUT)  # bound for any single call, as R-4.7 requires
+    watchdog.start()
     try:
         remote = steps()
     except ProtocolError as e:
@@ -120,10 +137,16 @@ def _run(sock: socket.socket, role: str, steps: Callable[[], PeerIdentity]) -> P
         _send_error(sock, e)
         raise
     except OSError as e:  # includes ConnectionError and socket.timeout; caller closes
+        if expired.is_set():
+            log.warning("%s handshake failed: no completion within %s s", role, HANDSHAKE_TIMEOUT)
+            raise TimeoutError("handshake deadline exceeded") from e
         log.warning("%s handshake failed: %s", role, e)
         raise
     finally:
+        watchdog.cancel()
         sock.settimeout(previous)
+    if expired.is_set():  # deadline hit just as steps() returned: socket is already shut down
+        raise TimeoutError("handshake deadline exceeded")
     log.info("%s handshake ok with %s (%s)", role, remote.name, remote.peer_id)
     return remote
 

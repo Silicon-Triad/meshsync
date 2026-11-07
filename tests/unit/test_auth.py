@@ -1,5 +1,6 @@
 import socket
 import threading
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -17,7 +18,7 @@ from meshsync.net.auth import (
     verify,
 )
 from meshsync.protocol.constants import NONCE_BYTES, ErrorCode, MsgType
-from meshsync.protocol.framing import ProtocolError, recv_msg, send_msg
+from meshsync.protocol.framing import ProtocolError, pack_header, recv_msg, send_msg
 from meshsync.protocol.messages import decode_body, encode_body
 
 KEY = bytes(range(32))
@@ -194,3 +195,45 @@ def test_silent_peer_times_out(monkeypatch: pytest.MonkeyPatch) -> None:
     finally:
         a.close()
         b.close()
+
+
+def test_slow_peer_hits_whole_handshake_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Each step is under the limit, but the total is over it: must still fail (§6.5).
+    monkeypatch.setattr(auth, "HANDSHAKE_TIMEOUT", 0.5)
+
+    def slow_initiator(s: socket.socket) -> object:
+        hello = {"peer_id": ALICE.peer_id, "name": "x", "proto_ver": 1, "nonce_i": NONCE_I}
+        time.sleep(0.3)
+        send_msg(s, MsgType.HELLO, 0, encode_body(MsgType.HELLO, hello))
+        recv_msg(s)  # HELLO_ACK
+        time.sleep(0.3)  # 0.6 s total > 0.5 s, though no single wait exceeds 0.5 s
+        try:
+            send_msg(s, MsgType.AUTH, 0, encode_body(MsgType.AUTH, {"mac_i": "0" * 64}))
+        except OSError:
+            pass  # responder may already have shut the socket
+        return None
+
+    _, right = run_pair(slow_initiator, responder(KEY, BOB))
+    assert isinstance(right, TimeoutError)
+
+
+def test_dripping_peer_hits_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    # One byte at a time inside a single frame must not reset the clock.
+    monkeypatch.setattr(auth, "HANDSHAKE_TIMEOUT", 0.5)
+    hello = {"peer_id": ALICE.peer_id, "name": "x", "proto_ver": 1, "nonce_i": NONCE_I}
+    body = encode_body(MsgType.HELLO, hello)
+
+    def drip(s: socket.socket) -> object:
+        data = pack_header(MsgType.HELLO, 0, len(body)) + body
+        for i in range(len(data)):
+            time.sleep(0.1)
+            try:
+                s.sendall(data[i : i + 1])
+            except OSError:
+                return None
+        return None
+
+    start = time.monotonic()
+    _, right = run_pair(drip, responder(KEY, BOB))
+    assert isinstance(right, TimeoutError)
+    assert time.monotonic() - start < 2
