@@ -24,6 +24,24 @@ CA before HELLO (`src/meshsync/net/tls.py`, `docs/PROTOCOL.md` §6). Generate ce
 laptop's `~/.meshsync/certs/`: `ca.crt`, `<name>.crt` and `<name>.key` for that laptop's
 `--name`. `ca.key` stays offline with one member. `--plain` skips TLS.
 
+## Config file
+
+Optional TOML file, default `~/.meshsync/config.toml` (`--config PATH` overrides). Keys match
+the `run` flags; a CLI flag beats the file, the file beats the built-in default.
+
+```toml
+sync_dir = "~/MeshSync"
+name = "ahmed"                  # must equal the cert name, [a-z0-9_-]{1,32}
+secret_file = "~/.meshsync/key" # chmod 600; only the path goes here
+tls = true
+cert_dir = "~/.meshsync/certs"  # ca.crt, ahmed.crt, ahmed.key
+tcp_port = 47001
+udp_port = 47000
+chunking = "cdc"                # or "fixed"
+peers = ["192.168.1.12:47001"]  # optional static peers
+log_level = "INFO"
+```
+
 ## Tests and lint
 
 ```bash
