@@ -128,6 +128,14 @@ R → I  AUTH_OK
 ```
 
 - `|` is concatenation. The secret `K` never crosses the wire.
+- **MAC input encoding (decision g):** the HMAC input is the single ASCII byte `R` (0x52) or
+  `I` (0x49) followed by the two nonces as raw bytes (hex-decoded, 16 bytes each), so 33 bytes in
+  total. The MAC is sent as lowercase hex. The role prefix makes `mac_r` and `mac_i` differ even
+  for the same nonces, so an attacker cannot reflect one side's MAC back as the other side's proof.
+- All handshake messages (HELLO, HELLO_ACK, AUTH, AUTH_OK, and any ERROR during the handshake)
+  carry `REQ_ID = 0`: they are a fixed sequence, not multiplexed requests.
+- `proto_ver` ≠ 1 in HELLO → ERROR `BAD_VERSION` (0x02) and close. A remote `peer_id` equal to
+  the receiver's own (self-connection) → ERROR `AUTH_FAILED` (0x04) and close.
 - MACs are compared in constant time (`hmac.compare_digest`).
 - A wrong MAC → ERROR `AUTH_FAILED` (0x04) and close.
 - The whole handshake must complete within **10 s**, else close.
@@ -196,6 +204,8 @@ the connection after sending ERROR.
   `file_hash` the SHA-256 of empty content
   (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`). Paths must not contain
   control characters (U+0000–U+001F, U+007F).
+- **(g)** §6.5 writes `"R" | nonce_i | nonce_r` without a byte encoding. The HMAC input is the
+  role byte followed by the raw (hex-decoded) nonce bytes; see §5. (Implemented in `net/auth.py`.)
 
 ## Changelog
 
@@ -205,3 +215,4 @@ the connection after sending ERROR.
 | 2026-11-07 | TLS mode: wrap before HELLO, hostname check off, cert-CN = HELLO name, decision (e) |
 | 2026-11-07 | Decisions (c) invalid body → fatal BAD_HEADER, (d) hex case, (f) tombstone shape and path control chars (#31) |
 | 2026-11-07 | §2: discovery drop-rule order, replay state kept after LEAVE, sender ts strictly increasing (#1) |
+| 2026-11-07 | Decision (g): HMAC input encoding; REQ_ID 0 during handshake (#4) |
