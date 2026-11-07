@@ -87,6 +87,15 @@ def build_announce(
     return encode_announce(fields)
 
 
+def next_ts(now: float, last_sent: int) -> int:
+    """ts for our next datagram: wall-clock seconds, but always > the last ts we sent.
+
+    ts has 1 s resolution, and receivers drop ts <= the last accepted one (decision b). Without
+    this, a LEAVE sent in the same second as our last ANNOUNCE would be dropped as a replay.
+    """
+    return max(int(now), last_sent + 1)
+
+
 class PeerTable:
     """Peers we have heard from. Thread-safe: every method takes the lock."""
 
@@ -187,6 +196,7 @@ class Discovery:
         self._on_event = on_event
         self._dest = (broadcast_addr, udp_port)
         self._stop = threading.Event()
+        self._last_sent_ts = 0  # see next_ts(); only the sender thread, then stop(), touch it
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # §14: several local peers share the UDP port, so allow address reuse.
         self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -211,8 +221,9 @@ class Discovery:
         self._sock.close()
 
     def _send(self, type: str) -> None:  # noqa: A002 - matches the §6.2 field name
+        self._last_sent_ts = next_ts(time.time(), self._last_sent_ts)
         data = build_announce(
-            self._key, self._me, self._tcp_port, self._index_rev(), int(time.time()), type
+            self._key, self._me, self._tcp_port, self._index_rev(), self._last_sent_ts, type
         )
         try:
             self._sock.sendto(data, self._dest)

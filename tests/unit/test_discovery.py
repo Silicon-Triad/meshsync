@@ -13,6 +13,7 @@ from meshsync.net.discovery import (
     PeerTable,
     build_announce,
     make_tag,
+    next_ts,
 )
 from meshsync.protocol.constants import ANNOUNCE_MAX_SKEW, MAX_DATAGRAM, PEER_EXPIRY
 
@@ -82,6 +83,20 @@ def test_replay_after_leave_does_not_revive(table: PeerTable) -> None:
     table.handle_datagram(old, IP, NOW)
     table.handle_datagram(announce(NOW + 1, "LEAVE"), IP, NOW + 1)
     assert table.handle_datagram(old, IP, NOW + 2) is None
+
+
+def test_next_ts_strictly_increases_within_one_second() -> None:
+    assert next_ts(NOW + 0.2, 0) == NOW
+    assert next_ts(NOW + 0.9, NOW) == NOW + 1  # same second: bumped so (b) accepts it
+    assert next_ts(NOW + 5.0, NOW + 1) == NOW + 5  # clock ahead again: back to wall clock
+
+
+def test_leave_in_same_second_as_announce_accepted(table: PeerTable) -> None:
+    # Regression: CI dropped a LEAVE sent in the same second as the last ANNOUNCE as a replay.
+    first = next_ts(NOW, 0)
+    table.handle_datagram(announce(first), IP, NOW)
+    leave = announce(next_ts(NOW, first), "LEAVE")
+    assert table.handle_datagram(leave, IP, NOW) == "down"
 
 
 def test_own_peer_id_ignored(table: PeerTable) -> None:
