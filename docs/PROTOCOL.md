@@ -158,11 +158,12 @@ R → I  AUTH_OK
 - Mode mismatch or untrusted certificate → TLS handshake fails → logged and closed.
 - Hostname checking is off because peers dial by IP from discovery, not by name (decision
   (e)). Trust comes from the CA chain only, so any group member's cert is valid on the wire.
-- **(e) Cert-name rule:** after HELLO, the receiver checks that the CN of the peer's verified
-  certificate equals the HELLO `name`; on mismatch the connection is closed.
-  This stops a valid member cert from claiming another member's name.
-  Implemented in `net/connection.py` `establish()`: on mismatch it sends ERROR `AUTH_FAILED`,
-  closes the socket and fails.
+- **(e) Cert-name rule:** once the HMAC handshake has completed (the HELLO `name` is then
+  known and authenticated), and before any other message is sent or accepted, each side checks
+  that the CN of the peer's verified certificate equals the HELLO `name`; on mismatch it sends
+  ERROR `AUTH_FAILED` and closes. This stops a valid member cert from claiming another member's
+  name. Implemented in `net/connection.py` `establish()`, which returns a Connection only after
+  the check; so no INDEX, NOTIFY or chunk traffic flows for a mismatching peer.
 
 ## 7. State machine
 

@@ -365,3 +365,49 @@ def test_concurrent_sends_arrive_intact() -> None:
     for t in threads:
         t.join(WAIT)
     conn.close(send_bye=False)
+
+
+# ---------------------------------------------------------------- review follow-ups (PR #38)
+
+
+def test_handshake_message_with_our_parity_is_still_illegal_state() -> None:
+    conn, peer = raw_pair()  # responder: even ids are replies to us
+    fut = conn.request(MsgType.INDEX_REQ, {})
+    _, our_id, _ = recv_raw(peer)
+    send_raw(peer, MsgType.AUTH_OK, our_id, {})  # must not complete the pending Future
+    msg_type, _, body = recv_raw(peer)
+    assert msg_type == MsgType.ERROR and body["code"] == ErrorCode.ILLEGAL_STATE  # type: ignore
+    with pytest.raises(ConnectionError):
+        fut.result(WAIT)
+
+
+def test_send_rejects_req_id_of_our_own_parity() -> None:
+    a, _ = pair()  # initiator: odd ids are ours
+    with pytest.raises(ValueError):
+        a.send(MsgType.INDEX, _index(), 3)
+    with pytest.raises(ValueError):
+        a.reply(5, MsgType.INDEX, _index())
+    a.close(send_bye=False)
+
+
+def test_alloc_id_raises_when_every_id_is_pending(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(connection, "MAX_REQ_ID", 5)  # initiator ids: 1, 3, 5 (bound: 2)
+    a, _ = pair()
+    with a._lock:
+        a._pending.update({1: Future(), 3: Future()})
+        with pytest.raises(RuntimeError):
+            a._alloc_id()
+
+
+def test_close_does_not_wait_for_a_stuck_sender() -> None:
+    conn, peer = raw_pair()
+    reasons: list[str] = []
+    conn.on_close(lambda c, reason: reasons.append(reason))
+    conn._send_lock.acquire()  # pretend a sender is stuck in send_msg
+    started = time.monotonic()
+    conn.close("bye")
+    assert time.monotonic() - started < WAIT
+    assert conn.closed and len(reasons) == 1
+    conn._send_lock.release()
+    with pytest.raises(ConnectionError):  # BYE was skipped: the peer just sees EOF
+        recv_raw(peer)

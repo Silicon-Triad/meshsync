@@ -15,6 +15,14 @@ REQ_ID parity (PROTOCOL.md decision (h)): the initiator allocates odd ids, the r
 ones. An incoming id with OUR parity is a reply to one of our requests; the other parity is the
 peer's own request. Without this, the peer's request 5 could be mistaken for the reply to our 5.
 
+Known limitation (follow-up issue): in TLS mode the reader thread (SSL_read) and senders
+(SSL_write) use the same SSLSocket at the same time. _send_lock only serialises the writers.
+OpenSSL does not promise that this is safe, and TLS 1.3 post-handshake messages make it more
+likely to matter. It is untested under load; plain mode is not affected.
+
+Idle connections: the reader gives up after READ_TIMEOUT seconds of silence. Until PeerManager
+(#3) sends PINGs, a quiet link is closed after that time.
+
 Threads (§9.1): one reader thread; all socket writes under _send_lock; _lock guards the state, id
 counter and pending map. No socket I/O under _lock and no user callback or Future resolution
 under any lock.
@@ -203,7 +211,10 @@ class Connection:
     # ------------------------------------------------------------ sending
 
     def request(self, msg_type: MsgType, body: dict | bytes) -> Future:
-        """Send a request. Future: (MsgType, body), or RemoteError / ConnectionError."""
+        """Send a request. Future: (MsgType, body), or RemoteError / ConnectionError.
+
+        The reply's type is not checked against the request's: that is the caller's job.
+        """
         data = encode_body(msg_type, body)
         fut: Future = Future()
         with self._lock:
@@ -216,6 +227,8 @@ class Connection:
 
     def send(self, msg_type: MsgType, body: dict | bytes, req_id: int = 0) -> None:
         """Unsolicited message (NOTIFY, BYE) or a reply (req_id = the request's id)."""
+        if req_id and req_id % 2 == self._parity:  # our parity = ids of OUR requests
+            raise ValueError(f"req_id {req_id} is one of our request ids; replies echo the peer's")
         data = encode_body(msg_type, body)
         if self.closed:
             raise ConnectionError("connection closed")
@@ -227,6 +240,8 @@ class Connection:
 
     def _alloc_id(self) -> int:
         """Next free id of our parity in 1..MAX_REQ_ID, wrapping, never 0. Caller holds _lock."""
+        if len(self._pending) >= MAX_REQ_ID // 2:  # every id of our parity is in use
+            raise RuntimeError("no free REQ_ID")
         while True:
             req_id = self._next_id
             self._next_id = req_id + 2 if req_id + 2 <= MAX_REQ_ID else self._first_id
@@ -265,10 +280,7 @@ class Connection:
             callbacks, self._close_callbacks = self._close_callbacks, []
         log.info("closing connection to %s: %s", self._remote.name, reason or "no reason")
         if send_bye:
-            try:
-                self._send_raw(MsgType.BYE, 0, encode_body(MsgType.BYE, {"reason": reason}))
-            except OSError as e:
-                log.debug("could not send BYE: %s", e)
+            self._try_send_bye(reason)
         try:
             self._sock.shutdown(socket.SHUT_RDWR)  # wakes the reader thread out of recv
         except OSError as e:
@@ -278,6 +290,20 @@ class Connection:
             _settle(fut, exc=ConnectionError(reason or "connection closed"))
         for fn in callbacks:
             self._run_callback(fn, reason)
+
+    def _try_send_bye(self, reason: str) -> None:
+        """Best-effort BYE. If a sender holds the lock (maybe stuck on a peer that does not read),
+        skip it: waiting could block close() for the whole socket timeout. The shutdown that
+        follows also unblocks that sender."""
+        if not self._send_lock.acquire(blocking=False):
+            log.debug("sender busy, skipping BYE")
+            return
+        try:
+            send_msg(self._sock, MsgType.BYE, 0, encode_body(MsgType.BYE, {"reason": reason}))
+        except OSError as e:
+            log.debug("could not send BYE: %s", e)
+        finally:
+            self._send_lock.release()
 
     def _run_callback(self, fn: CloseCallback, reason: str) -> None:
         try:
@@ -307,6 +333,11 @@ class Connection:
 
         if msg_type == MsgType.ERROR:
             self._on_error(req_id, ours, body)
+        elif msg_type in _HANDSHAKE_TYPES:  # handshake is over (§6.7)
+            self._send_error(
+                ErrorCode.ILLEGAL_STATE, f"{msg_type.name} after authentication", req_id
+            )
+            self.close(f"illegal {msg_type.name}", send_bye=False)
         elif ours:
             with self._lock:
                 fut = self._pending.pop(req_id, None)
@@ -314,11 +345,6 @@ class Connection:
                 log.debug("reply %d has no pending request (cancelled or closed)", req_id)
             else:
                 _settle(fut, result=(msg_type, body))
-        elif msg_type in _HANDSHAKE_TYPES:  # handshake is over (§6.7)
-            self._send_error(
-                ErrorCode.ILLEGAL_STATE, f"{msg_type.name} after authentication", req_id
-            )
-            self.close(f"illegal {msg_type.name}", send_bye=False)
         elif msg_type == MsgType.PING:  # liveness timing belongs to PeerManager (#3)
             self.reply(req_id, MsgType.PONG, {"t": body["t"]})
         elif msg_type == MsgType.BYE:
