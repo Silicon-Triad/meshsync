@@ -28,3 +28,4 @@ select = ["E", "F", "W", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["slow: takes more than 1 s (real sockets/threads)"]

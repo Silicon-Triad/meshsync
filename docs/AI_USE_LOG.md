@@ -10,3 +10,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-07 | Muhammad Ahmed Qazi | Claude Code (Opus 5.5) | TLS contexts (#5): net/tls.py, tests/unit/test_tls.py, PROTOCOL.md §6, README | |
 | 2026-11-07 | Muhammad Ahmed Qazi | Claude Code | messages.py scaffold + tests (#31) | Reviewed messages.py and tests line by line; decided review round 1 (decision label (c), tombstone shape (f), kept branch name); fixes from Mujtaba's review (RecursionError, path control chars, allow_nan, hex case (d)) applied via Claude |
 | 2026-11-07 | Muhammad Ahmed Qazi | Claude Code | CLI + config (#6): config.py, __main__.py, tests/unit/test_config.py, README config example | |
+| 2026-11-07 | Muhammad Ahmed Qazi | Claude Code | UDP discovery (#1): net/discovery.py, tests/unit/test_discovery.py, PROTOCOL.md §2 drop rules | <kept/changed> |
