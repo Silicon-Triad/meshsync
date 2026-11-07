@@ -89,6 +89,12 @@ unknown TYPE → `BAD_HEADER` (**decision a**); BODY_LEN > 1 MiB → `TOO_LARGE`
 Because responses carry the request's `REQ_ID`, they may arrive out of order on one connection
 (no head-of-line blocking).
 
+**REQ_ID allocation (decision h):** both peers allocate request IDs independently, so the
+initiator uses **odd** IDs (1, 3, 5, …) and the responder **even** IDs (2, 4, 6, …); 0 is never
+used for a request. IDs wrap after `0xFFFFFFFF` and skip IDs still waiting for a reply. A message
+whose non-zero `REQ_ID` has the receiver's own parity is a reply to the receiver's request; the
+other parity is the sender's own request (or reply to it).
+
 ## 4. Message types
 
 I = initiator, R = responder. Dial rule: the peer with the lower `peer_id` initiates.
@@ -152,9 +158,12 @@ R → I  AUTH_OK
 - Mode mismatch or untrusted certificate → TLS handshake fails → logged and closed.
 - Hostname checking is off because peers dial by IP from discovery, not by name (decision
   (e)). Trust comes from the CA chain only, so any group member's cert is valid on the wire.
-- **(e) Cert-name rule:** after HELLO, the receiver checks that the CN of the peer's verified
-  certificate equals the HELLO `name`; on mismatch the connection is closed.
-  This stops a valid member cert from claiming another member's name.
+- **(e) Cert-name rule:** once the HMAC handshake has completed (the HELLO `name` is then
+  known and authenticated), and before any other message is sent or accepted, each side checks
+  that the CN of the peer's verified certificate equals the HELLO `name`; on mismatch it sends
+  ERROR `AUTH_FAILED` and closes. This stops a valid member cert from claiming another member's
+  name. Implemented in `net/connection.py` `establish()`, which returns a Connection only after
+  the check; so no INDEX, NOTIFY or chunk traffic flows for a mismatching peer.
 
 ## 7. State machine
 
@@ -166,7 +175,19 @@ CONNECTED --HELLO/ACK/AUTH/AUTH_OK--> AUTHENTICATED --INDEX exchange--> SYNCED
 
 - Any message other than the next handshake step before AUTHENTICATED → ERROR
   `ILLEGAL_STATE` (0x03) and close.
-- PING every 10 s; 3 consecutive missed PONGs → CLOSED.
+- `net/connection.py` implements three states: AUTHENTICATED (after `establish()`, which covers
+  CONNECTED and the handshake), SYNCED (set by the sync layer after the INDEX exchange) and
+  CLOSED (final). CLOSED fails every request still waiting for a reply.
+- A handshake message (HELLO, HELLO_ACK, AUTH, AUTH_OK) after AUTHENTICATED → ERROR
+  `ILLEGAL_STATE` (0x03) and close (decision i).
+- A well-formed message of a type nobody handles → ERROR `INTERNAL` (0x7F) with `msg`
+  `"unsupported"`, carrying the request's `REQ_ID`; not fatal, the connection stays open
+  (decision i). An unhandled PONG is ignored.
+- A handler that fails is answered with ERROR `INTERNAL`; not fatal.
+- A fatal ERROR (§8) received in any state closes the connection; if it answers one of our
+  requests, that request fails first.
+- PING every 10 s; 3 consecutive missed PONGs → CLOSED. A PING is answered with a PONG echoing
+  `t` and the `REQ_ID`. A connection with no incoming bytes for 40 s (4 × 10 s) is closed.
 - At most 8 outstanding CHUNK_REQ per peer.
 
 ## 8. Error codes
@@ -206,6 +227,10 @@ the connection after sending ERROR.
   control characters (U+0000–U+001F, U+007F).
 - **(g)** §6.5 writes `"R" | nonce_i | nonce_r` without a byte encoding. The HMAC input is the
   role byte followed by the raw (hex-decoded) nonce bytes; see §5. (Implemented in `net/auth.py`.)
+- **(h)** Request IDs are odd for the initiator and even for the responder (§3), so a peer's
+  request cannot be mistaken for the reply to ours. (Implemented in `net/connection.py`.)
+- **(i)** After AUTHENTICATED, a handshake message → fatal `ILLEGAL_STATE`; a message type with no
+  handler → non-fatal `INTERNAL` "unsupported" (§7). §6.8 has no dedicated code for either.
 
 ## Changelog
 
@@ -216,3 +241,4 @@ the connection after sending ERROR.
 | 2026-11-07 | Decisions (c) invalid body → fatal BAD_HEADER, (d) hex case, (f) tombstone shape and path control chars (#31) |
 | 2026-11-07 | §2: discovery drop-rule order, replay state kept after LEAVE, sender ts strictly increasing (#1) |
 | 2026-11-07 | Decision (g): HMAC input encoding; REQ_ID 0 during handshake (#4) |
+| 2026-11-07 | §3 REQ_ID odd/even by role (h); §6 cert-CN check in `establish()`; §7 states, ILLEGAL_STATE after auth, unsupported type → INTERNAL (i) (#2) |
