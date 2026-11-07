@@ -34,6 +34,10 @@ SCAN_INTERVAL = 2
 # Authentication (§6.5)
 NONCE_BYTES = 16
 
+# Hex string lengths in message bodies (§6.2, §6.4, §7.1)
+PEER_ID_HEX_LEN = 8  # §6.2: peer_id is 8 hex characters
+SHA256_HEX_LEN = 64  # SHA-256 digest (32 bytes) as hex: chunk/file hashes, MACs, tags
+
 # Transfer (§7.3)
 MAX_OUTSTANDING_PER_PEER = 8
 

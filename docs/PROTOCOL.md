@@ -166,9 +166,13 @@ the connection after sending ERROR.
 - **(a)** An unknown TYPE code in a TCP header is treated as fatal `BAD_HEADER` (0x01).
 - **(b)** Discovery replay within the 30 s window: receivers should also reject `ts` ≤ the last
   seen `ts` for that `peer_id`.
+- **(f)** A malformed or invalid TCP message body (not UTF-8 JSON, missing/unknown key, wrong
+  type or format, invalid index entry or path) is treated as fatal `BAD_HEADER` (0x01), since
+  §6.8 has no dedicated code. (Implemented in `protocol/messages.py`.)
 
 ## Changelog
 
 | Date       | Change                                                        |
 | ---------- | ------------------------------------------------------------- |
 | 2026-11-02 | Initial version from PROJECT_CONTEXT.md §6, decisions (a), (b) |
+| 2026-11-07 | Decision (f): invalid message body → fatal BAD_HEADER (#31)  |
