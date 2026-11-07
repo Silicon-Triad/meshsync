@@ -50,7 +50,7 @@ CDC_MAX = 256 * 1024
 # Paths (§7.3)
 META_DIR = ".meshsync"
 
-# Tombstones (§7.3, PROTOCOL.md decision (e)): a deleted entry has size 0, no chunks and the
+# Tombstones (§7.3, PROTOCOL.md decision (f)): a deleted entry has size 0, no chunks and the
 # SHA-256 of empty content.
 EMPTY_FILE_HASH = hashlib.sha256(b"").hexdigest()
 

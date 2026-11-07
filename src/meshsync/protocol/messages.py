@@ -171,7 +171,7 @@ _ENTRY_SCHEMA: dict[str, Checker] = {
 def _check_entry(entry: Any) -> None:
     """Shape and formats only. Consistency of size/chunks/file_hash is the engine's job (sync/)."""
     _check_fields(entry, _ENTRY_SCHEMA)
-    # PROTOCOL.md decision (e): a tombstone carries no content.
+    # PROTOCOL.md decision (f): a tombstone carries no content.
     if entry["deleted"] and (
         entry["size"] != 0 or entry["chunks"] != [] or entry["file_hash"] != EMPTY_FILE_HASH
     ):
