@@ -56,6 +56,18 @@ Rules:
 - **Replay within the window (decision b):** receivers should also drop a datagram whose `ts` is
   less than or equal to the last accepted `ts` from that `peer_id`. (Implemented in
   `net/discovery.py`.)
+- Receivers check a datagram in this order and drop it at the first failing rule (each drop is
+  logged; bad tag, stale ts and replay at WARNING):
+  1. not valid UTF-8 JSON of the shape above, or larger than 512 bytes;
+  2. `peer_id` is the receiver's own (its own broadcast echoed back; dropped silently);
+  3. `tag` wrong (compared with `hmac.compare_digest`);
+  4. `|now - ts| > 30 s`;
+  5. `ts` ≤ last accepted `ts` for that `peer_id` (replay, decision b). The last `ts` is kept
+     after LEAVE or expiry, so an old datagram cannot bring a departed peer back.
+- Senders make `ts` strictly increasing: `ts = max(unix_seconds, last_sent_ts + 1)`, so a LEAVE
+  sent in the same second as the last ANNOUNCE is not taken for a replay. `ts` can then run at
+  most a second or so ahead of the wall clock, well inside the 30 s window.
+- The peer's address is the datagram's source IP, never a value from the body.
 - A peer not heard from for **15 s** is removed from the peer table. LEAVE removes it at once.
 
 ## 3. TCP frame
@@ -192,3 +204,4 @@ the connection after sending ERROR.
 | 2026-11-02 | Initial version from PROJECT_CONTEXT.md §6, decisions (a), (b) |
 | 2026-11-07 | TLS mode: wrap before HELLO, hostname check off, cert-CN = HELLO name, decision (e) |
 | 2026-11-07 | Decisions (c) invalid body → fatal BAD_HEADER, (d) hex case, (f) tombstone shape and path control chars (#31) |
+| 2026-11-07 | §2: discovery drop-rule order, replay state kept after LEAVE, sender ts strictly increasing (#1) |
