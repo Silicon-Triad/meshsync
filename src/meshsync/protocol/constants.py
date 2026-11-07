@@ -5,6 +5,7 @@
 Single home for every value from PROJECT_CONTEXT.md §6 and §7. Nothing else may hard-code these.
 """
 
+import hashlib
 import struct
 from enum import IntEnum
 
@@ -48,6 +49,10 @@ CDC_MAX = 256 * 1024
 
 # Paths (§7.3)
 META_DIR = ".meshsync"
+
+# Tombstones (§7.3, PROTOCOL.md decision (e)): a deleted entry has size 0, no chunks and the
+# SHA-256 of empty content.
+EMPTY_FILE_HASH = hashlib.sha256(b"").hexdigest()
 
 
 class MsgType(IntEnum):

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from meshsync.protocol.constants import MAX_DATAGRAM, ErrorCode, MsgType
+from meshsync.protocol.constants import EMPTY_FILE_HASH, MAX_BODY, MAX_DATAGRAM, ErrorCode, MsgType
 from meshsync.protocol.framing import ProtocolError
 from meshsync.protocol.messages import (
     canonical_json,
@@ -135,6 +135,23 @@ def test_invalid_json() -> None:
         assert exc.value.code == ErrorCode.BAD_HEADER
 
 
+def test_deeply_nested_json() -> None:
+    data = b"[" * 200000
+    assert len(data) < MAX_BODY
+    with pytest.raises(ProtocolError) as exc:
+        decode_body(MsgType.PING, data)
+    assert exc.value.code == ErrorCode.BAD_HEADER
+    with pytest.raises(ValueError):
+        decode_announce(b"{" * 400)
+
+
+@pytest.mark.parametrize("t", [float("nan"), float("inf")])
+def test_encode_rejects_nan(t: float) -> None:
+    with pytest.raises(ProtocolError) as exc:
+        encode_body(MsgType.PING, {"t": t})
+    assert exc.value.code == ErrorCode.BAD_HEADER
+
+
 def test_index_validates_entries() -> None:
     _bad(MsgType.INDEX, _with(MsgType.INDEX, files=[{**ENTRY, "path": "../x"}]))
 
@@ -171,6 +188,19 @@ def test_validate_entry_rejects(change: dict) -> None:
     assert exc.value.code == ErrorCode.BAD_HEADER
 
 
+TOMBSTONE = {**ENTRY, "size": 0, "file_hash": EMPTY_FILE_HASH, "chunks": [], "deleted": True}
+
+
+def test_tombstone_ok() -> None:
+    assert validate_entry(TOMBSTONE) is TOMBSTONE
+
+
+@pytest.mark.parametrize("change", [{"size": 1}, {"chunks": [H]}, {"file_hash": H}])
+def test_tombstone_with_content_rejected(change: dict) -> None:
+    with pytest.raises(ProtocolError):
+        validate_entry({**TOMBSTONE, **change})
+
+
 def test_validate_entry_missing_key() -> None:
     entry = dict(ENTRY)
     del entry["chunks"]
@@ -203,6 +233,10 @@ def test_validate_path_accepts(path: str) -> None:
         "a\\b",
         "..\\x",
         ".meshsync",
+        "a\x00b",
+        "a\nb",
+        "\x1f",
+        "a\x7fb",
         ".meshsync/x",
         ".meshsync/chunks/ab/" + H,
     ],

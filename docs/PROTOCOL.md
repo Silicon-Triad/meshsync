@@ -166,13 +166,21 @@ the connection after sending ERROR.
 - **(a)** An unknown TYPE code in a TCP header is treated as fatal `BAD_HEADER` (0x01).
 - **(b)** Discovery replay within the 30 s window: receivers should also reject `ts` ≤ the last
   seen `ts` for that `peer_id`.
-- **(f)** A malformed or invalid TCP message body (not UTF-8 JSON, missing/unknown key, wrong
-  type or format, invalid index entry or path) is treated as fatal `BAD_HEADER` (0x01), since
-  §6.8 has no dedicated code. (Implemented in `protocol/messages.py`.)
+- **(c)** A malformed or invalid TCP message body (not UTF-8 JSON, nested too deeply, missing or
+  unknown key, wrong type or format, invalid index entry or path) is treated as fatal
+  `BAD_HEADER` (0x01), since §6.8 has no dedicated code. (Implemented in `protocol/messages.py`.)
+- **(d)** Hex case is fixed on the wire: `peer_id` is exactly 8 **uppercase** hex characters (as in
+  the §2 example); SHA-256 hashes, MACs, tags and nonces are **lowercase** hex (Python
+  `hexdigest()` / `bytes.hex()`). Other case is rejected. A fixed case is needed because the dial
+  rule and the conflict rule (§7.2) compare `peer_id` as strings.
+- **(e)** A tombstone (`"deleted": true`) carries no content: `size` 0, `chunks` `[]`, and
+  `file_hash` the SHA-256 of empty content
+  (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`). Paths must not contain
+  control characters (U+0000–U+001F, U+007F).
 
 ## Changelog
 
 | Date       | Change                                                        |
 | ---------- | ------------------------------------------------------------- |
 | 2026-11-02 | Initial version from PROJECT_CONTEXT.md §6, decisions (a), (b) |
-| 2026-11-07 | Decision (f): invalid message body → fatal BAD_HEADER (#31)  |
+| 2026-11-07 | Decisions (c) invalid body → fatal BAD_HEADER, (d) hex case, (e) tombstone shape and path control chars (#31) |

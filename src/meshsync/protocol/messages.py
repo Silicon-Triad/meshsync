@@ -6,7 +6,7 @@ No sockets, no threads, no I/O.
 Owner: Muhammad Ahmed Qazi (CS-24045). Issue #31.
 
 Design: each field has a small checker that raises ValueError. Public TCP functions turn that into
-ProtocolError(BAD_HEADER) (PROTOCOL.md decision (f)); the UDP announce codec keeps ValueError,
+ProtocolError(BAD_HEADER) (PROTOCOL.md decision (c)); the UDP announce codec keeps ValueError,
 because UDP has no ERROR reply.
 """
 
@@ -17,6 +17,7 @@ from collections.abc import Callable
 from typing import Any
 
 from meshsync.protocol.constants import (
+    EMPTY_FILE_HASH,
     MAGIC,
     MAX_DATAGRAM,
     META_DIR,
@@ -36,6 +37,7 @@ Checker = Callable[[Any], None]
 _PEER_ID_RE = re.compile(rf"[0-9A-F]{{{PEER_ID_HEX_LEN}}}")  # §6.2 example: "A1F3C9D2"
 _SHA256_RE = re.compile(rf"[0-9a-f]{{{SHA256_HEX_LEN}}}")  # hashlib .hexdigest() is lowercase
 _NONCE_RE = re.compile(rf"[0-9a-f]{{{NONCE_BYTES * 2}}}")  # §6.5: 16 bytes as hex
+# Hex case is fixed by PROTOCOL.md decision (d): peer_id uppercase, all other hex lowercase.
 
 
 # ---------------------------------------------------------------- field checkers (raise ValueError)
@@ -122,6 +124,9 @@ def _check_path(path: Any) -> None:
         raise ValueError("empty path")
     if "\\" in path:
         raise ValueError("backslash in path")
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in path):
+        # NUL would make open() fail later; other control chars are never legitimate names.
+        raise ValueError("control character in path")
     if path.startswith("/"):
         raise ValueError("absolute path")
     segments = path.split("/")
@@ -164,7 +169,13 @@ _ENTRY_SCHEMA: dict[str, Checker] = {
 
 
 def _check_entry(entry: Any) -> None:
+    """Shape and formats only. Consistency of size/chunks/file_hash is the engine's job (sync/)."""
     _check_fields(entry, _ENTRY_SCHEMA)
+    # PROTOCOL.md decision (e): a tombstone carries no content.
+    if entry["deleted"] and (
+        entry["size"] != 0 or entry["chunks"] != [] or entry["file_hash"] != EMPTY_FILE_HASH
+    ):
+        raise ValueError("tombstone must have size 0, chunks [] and the empty-file hash")
 
 
 def _check_files(value: Any) -> None:
@@ -234,6 +245,20 @@ def _validate_body(msg_type: MsgType, body: Any) -> None:
         raise ProtocolError(ErrorCode.BAD_HEADER, f"{msg_type.name} body: {e}") from None
 
 
+def _parse_json(data: bytes) -> Any:
+    """UTF-8 JSON -> Python value. Raises ValueError on any malformed input.
+
+    Duplicate keys are accepted and the last value wins (json module default); the result is then
+    validated like any other body, so this cannot smuggle in an invalid value.
+    """
+    try:
+        return json.loads(data.decode("utf-8"), parse_constant=_reject_constant)
+    except RecursionError:
+        # Deeply nested input (e.g. b"[" * 200000) exhausts the parser's stack; it is not a
+        # ValueError, so convert it or it would escape the caller's error handling.
+        raise ValueError("JSON nested too deeply") from None
+
+
 def _reject_constant(name: str) -> None:
     # json.loads accepts NaN/Infinity by default; they are not valid JSON.
     raise ValueError(f"invalid JSON constant {name}")
@@ -249,7 +274,11 @@ def encode_body(msg_type: MsgType, body: dict | bytes) -> bytes:
             raise TypeError("CHUNK_DATA body must be bytes")
         return body
     _validate_body(msg_type, body)
-    return json.dumps(body, ensure_ascii=False).encode("utf-8")
+    try:
+        # allow_nan=False: NaN/Infinity are not JSON and our own decoder rejects them.
+        return json.dumps(body, ensure_ascii=False, allow_nan=False).encode("utf-8")
+    except ValueError as e:
+        raise ProtocolError(ErrorCode.BAD_HEADER, f"{msg_type.name} body: {e}") from None
 
 
 def decode_body(msg_type: MsgType, data: bytes) -> dict | bytes:
@@ -260,7 +289,7 @@ def decode_body(msg_type: MsgType, data: bytes) -> dict | bytes:
     if msg_type == MsgType.CHUNK_DATA:
         return data
     try:
-        body = json.loads(data.decode("utf-8"), parse_constant=_reject_constant)
+        body = _parse_json(data)
     except ValueError as e:  # UnicodeDecodeError and JSONDecodeError are ValueErrors
         raise ProtocolError(ErrorCode.BAD_HEADER, f"{msg_type.name} body not JSON: {e}") from None
     _validate_body(msg_type, body)
@@ -330,6 +359,6 @@ def decode_announce(data: bytes) -> dict:
     """Parse and shape-check a received datagram. Raises ValueError (UDP has no ERROR reply)."""
     if len(data) > MAX_DATAGRAM:
         raise ValueError(f"datagram {len(data)} > {MAX_DATAGRAM} bytes")
-    fields = json.loads(data.decode("utf-8"), parse_constant=_reject_constant)
+    fields = _parse_json(data)
     _check_fields(fields, _ANNOUNCE_SCHEMA)
     return fields
