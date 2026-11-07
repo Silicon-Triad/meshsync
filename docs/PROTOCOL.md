@@ -130,6 +130,11 @@ R → I  AUTH_OK
 - The socket is wrapped immediately after `connect()`/`accept()`, before HELLO. The protocol
   inside TLS is unchanged (HMAC handshake still runs).
 - Mode mismatch or untrusted certificate → TLS handshake fails → logged and closed.
+- Hostname checking is off because peers dial by IP from discovery, not by name (decision
+  (e)). Trust comes from the CA chain only, so any group member's cert is valid on the wire.
+- **(e) Cert-name rule:** after HELLO, the receiver checks that the CN of the peer's verified
+  certificate equals the HELLO `name`; on mismatch the connection is closed.
+  This stops a valid member cert from claiming another member's name.
 
 ## 7. State machine
 
@@ -166,9 +171,12 @@ the connection after sending ERROR.
 - **(a)** An unknown TYPE code in a TCP header is treated as fatal `BAD_HEADER` (0x01).
 - **(b)** Discovery replay within the 30 s window: receivers should also reject `ts` ≤ the last
   seen `ts` for that `peer_id`.
+- **(e)** TLS: `check_hostname` off (peers dial by IP); certificate CN must equal the HELLO
+  `name` (§6 above).
 
 ## Changelog
 
 | Date       | Change                                                        |
 | ---------- | ------------------------------------------------------------- |
 | 2026-11-02 | Initial version from PROJECT_CONTEXT.md §6, decisions (a), (b) |
+| 2026-11-07 | TLS mode: wrap before HELLO, hostname check off, cert-CN = HELLO name, decision (e) |

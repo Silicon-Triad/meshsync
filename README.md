@@ -16,7 +16,13 @@ meshsync status
 meshsync stats
 ```
 
-Certificates for TLS mode: `scripts/gen_certs.sh certs ahmed mujtaba huzaifa` (never commit the output).
+### TLS mode
+
+With `--tls`, every TCP connection is wrapped in TLS 1.3 with mutual certificates from the group
+CA before HELLO (`src/meshsync/net/tls.py`, `docs/PROTOCOL.md` §6). Generate certificates with
+`scripts/gen_certs.sh certs ahmed mujtaba huzaifa` (never commit the output), then copy to each
+laptop's `~/.meshsync/certs/`: `ca.crt`, `<name>.crt` and `<name>.key` for that laptop's
+`--name`. `ca.key` stays offline with one member. `--plain` skips TLS.
 
 ## Tests and lint
 
