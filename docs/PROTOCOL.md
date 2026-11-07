@@ -206,6 +206,23 @@ the connection after sending ERROR.
 | 0x20 | BUSY            | N     |
 | 0x7F | INTERNAL        | N     |
 
+## 8a. Peer management (`net/manager.py`)
+
+- **Dial rule (§6.4):** on an ANNOUNCE the peer with the lower `peer_id` opens the TCP connection;
+  the higher one waits. Peers given as `--peer host:port` (§14) are dialled by everyone, since
+  their `peer_id` is unknown before the handshake. Dials retry every 5 s (ANNOUNCE_INTERVAL)
+  while the peer is still in the UDP table (static peers: always) and not connected. A UDP LEAVE or
+  expiry never closes a working connection; only TCP liveness or BYE does.
+- **Duplicate connections (decision j):** if two links to the same `peer_id` exist (both sides
+  dialled at once), both ends keep the link whose initiator has the lower `peer_id` and close the
+  other with BYE `"duplicate"`. A new link from the same direction replaces the old one.
+- **Liveness (§6.7, D13):** every 10 s (PING_INTERVAL) each side sends PING `{t}`; the PONG gives
+  the RTT. A PING still unanswered at the next tick counts as one missed PONG; at 3
+  (MAX_MISSED_PONGS) the connection is closed with reason `"liveness"`.
+- **Reconnect:** after any close the dialing side tries again every 5 s while the peer is
+  announced (or is a static peer). A peer that crashed without BYE is noticed after at most
+  about 30 s (3 missed PONGs).
+
 ## 9. Decisions beyond PROJECT_CONTEXT.md
 
 - **(a)** An unknown TYPE code in a TCP header is treated as fatal `BAD_HEADER` (0x01).
@@ -230,6 +247,9 @@ the connection after sending ERROR.
   request cannot be mistaken for the reply to ours. (Implemented in `net/connection.py`.)
 - **(i)** After AUTHENTICATED, a handshake message → fatal `ILLEGAL_STATE`; a message type with no
   handler → non-fatal `INTERNAL` "unsupported" (§7). §6.8 has no dedicated code for either.
+- **(j)** Duplicate links to one peer: keep the one whose initiator has the lower `peer_id`
+  (§8a). §6.4 gives the dial rule but not what to do when both sides dial. (Implemented in
+  `net/manager.py`.)
 
 ## Changelog
 
@@ -241,3 +261,4 @@ the connection after sending ERROR.
 | 2026-11-07 | §2: discovery drop-rule order, replay state kept after LEAVE, sender ts strictly increasing (#1) |
 | 2026-11-07 | Decision (g): HMAC input encoding; REQ_ID 0 during handshake (#4) |
 | 2026-11-07 | §3 REQ_ID odd/even by role (h); §6 cert-CN check in `establish()`; §7 states, ILLEGAL_STATE after auth, unsupported type → INTERNAL (i) (#2) |
+| 2026-11-07 | §8a peer management: dial rule, duplicate-link rule (j), liveness, reconnect (#3) |
