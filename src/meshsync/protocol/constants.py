@@ -5,6 +5,7 @@
 Single home for every value from PROJECT_CONTEXT.md §6 and §7. Nothing else may hard-code these.
 """
 
+import hashlib
 import struct
 from enum import IntEnum
 
@@ -34,6 +35,10 @@ SCAN_INTERVAL = 2
 # Authentication (§6.5)
 NONCE_BYTES = 16
 
+# Hex string lengths in message bodies (§6.2, §6.4, §7.1)
+PEER_ID_HEX_LEN = 8  # §6.2: peer_id is 8 hex characters
+SHA256_HEX_LEN = 64  # SHA-256 digest (32 bytes) as hex: chunk/file hashes, MACs, tags
+
 # Transfer (§7.3)
 MAX_OUTSTANDING_PER_PEER = 8
 
@@ -44,6 +49,10 @@ CDC_MAX = 256 * 1024
 
 # Paths (§7.3)
 META_DIR = ".meshsync"
+
+# Tombstones (§7.3, PROTOCOL.md decision (f)): a deleted entry has size 0, no chunks and the
+# SHA-256 of empty content.
+EMPTY_FILE_HASH = hashlib.sha256(b"").hexdigest()
 
 
 class MsgType(IntEnum):
