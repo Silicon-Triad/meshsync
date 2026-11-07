@@ -13,3 +13,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-07 | Muhammad Ahmed Qazi | Claude Code | UDP discovery (#1): net/discovery.py, tests/unit/test_discovery.py, PROTOCOL.md §2 drop rules | <kept/changed> |
 | 2026-11-07 | Muhammad Ahmed Qazi | Claude Code | HMAC handshake (net/auth.py, tests, PROTOCOL.md decision g) (#4) | |
 | 2026-11-07 | Muhammad Ahmed Qazi | Claude Code (Sonnet 5.5) | Connection (#2): net/connection.py, tests/unit/test_connection.py, tests/conftest.py (shared cert fixtures), PeerIdentity dedupe, PROTOCOL.md §3/§6/§7 + decisions (h), (i) | |
+| 2026-11-07 | Muhammad Ahmed Qazi | Claude Code (Sonnet 5.5) | PeerManager (#3): net/manager.py, tests/unit/test_manager.py, PROTOCOL.md §8a + decision (j) | |
