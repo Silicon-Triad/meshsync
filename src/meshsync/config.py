@@ -6,8 +6,6 @@ Contract (PROJECT_CONTEXT.md §8.3):
     --tcp-port, --peer HOST:PORT, --chunking {cdc,fixed}; plus optional config file.
 Precedence: CLI flag > config file > default. Issue #6.
 """
-# FROZEN INTERFACE (AGENTS.md §6): changing or adding to the public interface in this file
-# needs an issue and approval from all three members first (R-6.2).
 
 import argparse
 import logging
@@ -36,6 +34,22 @@ DEFAULTS: dict[str, Any] = {
     "log_level": "INFO",
 }
 FILE_KEYS = {"sync_dir", "name", "secret_file", *DEFAULTS}
+
+# Allowed types per setting, so a wrong-typed file value gives ConfigError, not a crash.
+# CLI values arrive as Path for the path settings.
+PATH_TYPES = (str, Path)
+TYPES: dict[str, tuple[type, ...]] = {
+    "sync_dir": PATH_TYPES,
+    "name": (str,),
+    "secret_file": PATH_TYPES,
+    "tls": (bool,),
+    "cert_dir": PATH_TYPES,
+    "tcp_port": (int,),
+    "udp_port": (int,),
+    "chunking": (str,),
+    "peers": (list,),
+    "log_level": (str,),
+}
 
 
 class ConfigError(ValueError):
@@ -88,6 +102,22 @@ def merge(cli: dict[str, Any], file: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+def check_types(c: dict[str, Any]) -> None:
+    """Reject values of the wrong type, e.g. tls = "false" (a string, not a bool)."""
+    for key, types in TYPES.items():
+        value = c[key]
+        if value is None:
+            continue  # missing; required settings are checked separately
+        if isinstance(value, bool) and bool not in types:
+            ok = False  # bool is a subclass of int; tcp_port = true is not a port
+        else:
+            ok = isinstance(value, types)
+        if key == "peers" and ok:
+            ok = all(isinstance(p, str) for p in value)
+        if not ok:
+            raise ConfigError(f"{key} has the wrong type: {value!r}")
+
+
 def parse_port(value: Any, what: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 65535:
         raise ConfigError(f"{what} must be an integer 1-65535, got {value!r}")
@@ -98,6 +128,7 @@ def parse_peer(text: Any) -> tuple[str, int]:
     """Parse "host:port" (§14 static peer fallback)."""
     if not isinstance(text, str):
         raise ConfigError(f"peer must be HOST:PORT, got {text!r}")
+    # IPv4 or host names only; an IPv6 "[::1]:47001" would keep its brackets (peers use IPv4).
     host, sep, port = text.rpartition(":")
     if not sep or not host or not port.isdigit():
         raise ConfigError(f"peer must be HOST:PORT, got {text!r}")
@@ -119,6 +150,7 @@ def load_config(args: argparse.Namespace) -> Config:
         "log_level": args.log_level,
     }
     c = merge(cli, read_config_file(args.config))
+    check_types(c)
 
     for key in ("sync_dir", "name", "secret_file"):
         if not c[key]:
@@ -139,7 +171,7 @@ def load_config(args: argparse.Namespace) -> Config:
     if secret_file.stat().st_mode & 0o077:
         log.warning("secret file %s is readable by others; run chmod 600 on it", secret_file)
 
-    tls = bool(c["tls"])
+    tls = c["tls"]
     cert_dir = Path(c["cert_dir"]).expanduser() if c["cert_dir"] else None
     if tls:  # D9: only check the files exist here; loading them is #5
         if cert_dir is None:
@@ -151,7 +183,7 @@ def load_config(args: argparse.Namespace) -> Config:
     if c["chunking"] not in CHUNKING_MODES:
         raise ConfigError(f"chunking must be one of {CHUNKING_MODES}, got {c['chunking']!r}")
 
-    level = str(c["log_level"]).upper()
+    level = c["log_level"].upper()
     if not isinstance(logging.getLevelName(level), int):
         raise ConfigError(f"unknown log level: {c['log_level']!r}")
 

@@ -1,5 +1,7 @@
 """Tests for config loading and CLI parsing (#6). No real home dir: --config always given."""
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -114,3 +116,46 @@ def test_main_exit_codes(env):
     assert main(args_for(env)) == 1
     assert main(args_for(env, "--name", "BAD")) == 2
     assert main(["status"]) == 1
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        'tls = "false"',
+        "sync_dir = 5",
+        "name = 7",
+        "secret_file = true",
+        "cert_dir = 1",
+        'tcp_port = "47001"',
+        "udp_port = true",
+        "chunking = 1",
+        'peers = "h:1"',
+        "peers = [1]",
+        "log_level = 10",
+    ],
+)
+def test_wrong_types_in_file(env, line):
+    env["cfg"].write_text(line + "\n")
+    with pytest.raises(ConfigError):
+        load(args_for(env, required=False))  # no CLI flags, so the file value is used
+
+
+def test_tls_bool_in_file(env):
+    env["cfg"].write_text("tls = false\n")
+    assert load(args_for(env)).tls is False
+
+
+def test_unknown_file_key(env):
+    env["cfg"].write_text("colour = 1\n")
+    with pytest.raises(ConfigError):
+        load(args_for(env))
+
+
+def test_secret_permission_warning_formatted(env):
+    # Subprocess: pytest's own log handler would hide the CLI's logging.basicConfig format.
+    env["secret"].chmod(0o644)
+    r = subprocess.run(
+        [sys.executable, "-m", "meshsync", *args_for(env)], capture_output=True, text=True
+    )
+    assert r.returncode == 1
+    assert " WARNING meshsync.config: secret file" in r.stderr
