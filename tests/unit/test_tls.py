@@ -126,10 +126,30 @@ def test_mode_mismatch_tls_client_vs_plain_server(certs: Path) -> None:
     assert isinstance(cli, ssl.SSLError)
 
 
-def test_wrap_sets_handshake_timeout_when_none(certs: Path) -> None:
+def test_failed_handshake_closes_socket(certs: Path) -> None:
     s, c = socket.socketpair()
     c.close()  # peer gone, so the handshake fails fast
-    assert s.gettimeout() is None
     with pytest.raises((ssl.SSLError, OSError)):
         tls.wrap_server(s, tls.server_context(certs, "bob"))
-    assert s.gettimeout() == tls.HANDSHAKE_TIMEOUT
+    assert s.fileno() == -1  # §6.6: closed on failure
+
+
+def test_handshake_timeout_applies_when_none(certs: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tls, "HANDSHAKE_TIMEOUT", 0.2)  # keep the test fast
+    s, c = socket.socketpair()  # c never speaks, so the server handshake must time out
+    with pytest.raises((TimeoutError, ssl.SSLError, OSError)):
+        tls.wrap_server(s, tls.server_context(certs, "bob"))
+    c.close()
+
+
+def test_original_timeout_restored_after_handshake(certs: Path) -> None:
+    sctx = tls.server_context(certs, "bob")
+    cctx = tls.client_context(certs, "alice")
+    s, c = socket.socketpair()  # both start with no timeout
+    out: dict[str, object] = {}
+    t = threading.Thread(target=lambda: out.setdefault("s", tls.wrap_server(s, sctx)))
+    t.start()
+    cs = tls.wrap_client(c, cctx)
+    t.join(TIMEOUT)
+    assert cs.gettimeout() is None
+    assert out["s"].gettimeout() is None  # type: ignore[attr-defined]

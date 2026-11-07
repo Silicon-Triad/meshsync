@@ -46,15 +46,21 @@ def client_context(cert_dir: Path, name: str) -> ssl.SSLContext:
 
 
 def _wrap(sock: socket.socket, ctx: ssl.SSLContext, server_side: bool) -> ssl.SSLSocket:
-    """Wrap and handshake now; errors are logged and re-raised (§10 untrusted cert/mismatch)."""
-    if sock.gettimeout() is None:
-        sock.settimeout(HANDSHAKE_TIMEOUT)  # never hang on a handshake (§6.7)
+    """Wrap and handshake now. On failure: log, close the socket, re-raise (§6.6, §10)."""
+    old_timeout = sock.gettimeout()
+    if old_timeout is None:
+        # Interpretation: no TLS-specific timer exists, so reuse the HMAC handshake limit
+        # (§6.5, 10 s) so a TLS handshake can never hang.
+        sock.settimeout(HANDSHAKE_TIMEOUT)
     try:
-        return ctx.wrap_socket(sock, server_side=server_side, do_handshake_on_connect=True)
+        ssock = ctx.wrap_socket(sock, server_side=server_side, do_handshake_on_connect=True)
     except (ssl.SSLError, OSError) as e:
         # e.g. CERTIFICATE_VERIFY_FAILED (untrusted cert), WRONG_VERSION_NUMBER (mode mismatch)
         log.warning("TLS handshake failed (%s side): %s", "server" if server_side else "client", e)
+        sock.close()  # §6.6 "logged, closed"; ssl already closes on failure, this makes it explicit
         raise
+    ssock.settimeout(old_timeout)  # handshake limit must not leak into the reader (§6.7 PING)
+    return ssock
 
 
 def wrap_server(sock: socket.socket, ctx: ssl.SSLContext) -> ssl.SSLSocket:
