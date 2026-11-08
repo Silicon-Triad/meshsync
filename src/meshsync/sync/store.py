@@ -1,3 +1,5 @@
+# FROZEN INTERFACE (AGENTS.md §6): changing or adding to the public interface in this file
+# needs an issue and approval from all three members first (R-6.2).
 """Content-addressed chunk store.
 
 Owner: Mujtaba Jawaid Rao (CS-24047)
@@ -9,8 +11,6 @@ Hashes are 64 lowercase hex characters (SHA-256, PROTOCOL.md decision (d)); anyt
 ValueError, so a hash can never name a path outside the store. put() verifies the data against
 its hash and writes atomically (temp file + os.replace), so readers never see a partial chunk.
 """
-# FROZEN INTERFACE (AGENTS.md §6): changing or adding to the public interface in this file
-# needs an issue and approval from all three members first (R-6.2).
 
 import hashlib
 import logging
@@ -64,6 +64,10 @@ class ChunkStore:
         try:
             with os.fdopen(fd, "wb") as f:
                 f.write(data)
+                # Durable before the rename: after a power cut the final path must never
+                # hold a short or empty chunk, or has() would vouch for bad bytes forever.
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp, path)
         except BaseException:
             try:

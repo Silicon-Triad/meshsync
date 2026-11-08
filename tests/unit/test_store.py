@@ -97,3 +97,25 @@ def test_concurrent_puts_same_chunk(tmp_path: Path) -> None:
     assert list((tmp_path / ".meshsync" / "chunks" / h[:2]).iterdir()) == [
         tmp_path / ".meshsync" / "chunks" / h[:2] / h
     ]
+
+
+def test_put_fsyncs_before_replace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A power cut between write and rename must not leave a short chunk at the final path.
+    import meshsync.sync.store as store_mod
+
+    calls: list[str] = []
+    real_fsync, real_replace = store_mod.os.fsync, store_mod.os.replace
+
+    def fsync(fd: int) -> None:
+        calls.append("fsync")
+        real_fsync(fd)
+
+    def replace(src: str, dst: object) -> None:
+        calls.append("replace")
+        real_replace(src, dst)
+
+    monkeypatch.setattr(store_mod.os, "fsync", fsync)
+    monkeypatch.setattr(store_mod.os, "replace", replace)
+    data = b"durable"
+    ChunkStore(tmp_path).put(sha(data), data)
+    assert calls == ["fsync", "replace"]
