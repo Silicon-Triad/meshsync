@@ -4,9 +4,11 @@
 
 This document specifies the meshsync protocol in enough detail for another group to build a peer
 that works with ours, using this file alone (R1). It is derived from `docs/PROJECT_CONTEXT.md`
-§4–§7 and checked against the code on `main`. Where the two differed, the code was followed and
-the difference recorded in the decisions log (§13). Any protocol change must update this file in
-the same PR.
+§4–§7 and checked against the code on `main`. `PROJECT_CONTEXT.md` remains the source of truth
+(AGENTS.md R-1.2). Where the code differs from it, the difference was raised in issue #8, and
+this file describes the code's behaviour only as a decision **proposed for approval there**
+(marked *proposed* in §13). Until it is approved, `PROJECT_CONTEXT.md` takes precedence. Any
+protocol change must update this file in the same PR.
 
 Constant names in `code` (e.g. `TCP_PORT`) refer to `src/meshsync/protocol/constants.py`, the
 only place these values are defined.
@@ -800,8 +802,8 @@ From PROJECT_CONTEXT §5; each row points to where this spec implements it.
 | (j) | Duplicate links to one peer: keep the one whose initiator has the lower `peer_id`, close the other with BYE `"duplicate"`. | §8.2 |
 | (k) | The wiring between net, sync and transfer lives in `src/meshsync/node.py` (not listed in §8.2), which also defines `Action`. | §9.6 |
 | (l) | Own `peer_id` = 4 random bytes as uppercase hex, persisted in `<sync_dir>/.meshsync/peer_id`. | §8.5 |
-| (m) | Liveness and sync details taken from the code: PING is a request (non-zero `REQ_ID`) and PONG echoes it; RTT is measured on the local monotonic clock, `t` is only echoed; a link silent for 40 s is closed; a link becomes SYNCED even if the first INDEX exchange fails. | §5.10, §5.11, §8.3, §9.6 |
-| (n) | The TLS handshake is bounded by `HANDSHAKE_TIMEOUT` per socket operation, separately from the 10 s HMAC handshake limit. | §6.2 |
+| (m) | *Proposed, awaiting approval in #8.* Liveness and sync details taken from the code: PING is a request (non-zero `REQ_ID`) and PONG echoes it; RTT is measured on the local monotonic clock, `t` is only echoed; a link silent for 40 s is closed; a link becomes SYNCED even if the first INDEX exchange fails. | §5.10, §5.11, §8.3, §9.6 |
+| (n) | *Proposed, awaiting approval in #8.* The TLS handshake is bounded by `HANDSHAKE_TIMEOUT` per socket operation, separately from the 10 s HMAC handshake limit. | §6.2 |
 
 ### 13.2 Changelog
 
@@ -815,4 +817,4 @@ From PROJECT_CONTEXT §5; each row points to where this spec implements it.
 | 2026-11-07 | REQ_ID odd/even by role (h); cert-CN check in `establish()`; states, ILLEGAL_STATE after auth, unsupported type → INTERNAL (i) (#2) |
 | 2026-11-07 | Peer management: dial rule, duplicate-link rule (j), liveness, reconnect (#3) |
 | 2026-11-08 | Node wiring: peer_up → INDEX exchange → SYNCED; decisions (k), (l) (#40) |
-| 2026-11-08 | Consolidated into one document (#8): overview, field tables, worked examples generated from the code, per-message sections, transition table, error actions, security, improvements map; decisions (m), (n) record code behaviour not in PROJECT_CONTEXT.md |
+| 2026-11-08 | Consolidated into one document (#8): overview, field tables, worked examples generated from the code, per-message sections, transition table, error actions, security, improvements map; decisions (m), (n) proposed in #8 for code behaviour that differs from or is missing in PROJECT_CONTEXT.md |
