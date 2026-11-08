@@ -16,3 +16,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-07 | Muhammad Ahmed Qazi | Claude Code (Sonnet 5.5) | PeerManager (#3): net/manager.py, tests/unit/test_manager.py, PROTOCOL.md §8a + decision (j) | |
 | 2026-11-08 | Muhammad Ahmed Qazi | Claude Code (Sonnet 5.5) | node wiring (#40): node.py, __main__ run, tests/fakes.py, tests/unit/test_node.py, PROTOCOL.md §8b + decisions (k), (l) | |
 | 2026-11-08 | Muhammad Ahmed Qazi | Claude Code (Opus 5.5) | local mesh script (#7): scripts/run_local_mesh.sh, .gitignore, README local testing | |
+| 2026-11-08 | Muhammad Ahmed Qazi | Claude Code (Opus 5.5) | PROTOCOL.md consolidation (#8): rewrite as one spec, worked examples generated from the code | |
