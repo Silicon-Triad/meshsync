@@ -224,6 +224,18 @@ the connection after sending ERROR.
   announced (or is a static peer). A peer that crashed without BYE is noticed after at most
   about 30 s (3 missed PONGs).
 
+## 8b. Node wiring (`node.py`)
+
+Sequence after a connection is AUTHENTICATED (`peer_up`), on both sides:
+
+1. A worker thread sends INDEX_REQ `{}` and waits up to HANDSHAKE_TIMEOUT for INDEX.
+2. Every entry in INDEX goes to `engine.on_remote_entry`; "fetch" results are queued on a pool of 4
+   fetch workers (`scheduler.fetch`, then `engine.on_fetched`).
+3. `conn.mark_synced()` moves the link to SYNCED.
+
+Later changes travel as NOTIFY `{entry}` to every peer. CHUNK_REQ for an unknown hash is answered
+with the non-fatal ERROR CHUNK_NOT_FOUND. Handlers on reader threads only reply or queue work.
+
 ## 9. Decisions beyond PROJECT_CONTEXT.md
 
 - **(a)** An unknown TYPE code in a TCP header is treated as fatal `BAD_HEADER` (0x01).
@@ -251,6 +263,10 @@ the connection after sending ERROR.
 - **(j)** Duplicate links to one peer: keep the one whose initiator has the lower `peer_id`
   (§8a). §6.4 gives the dial rule but not what to do when both sides dial. (Implemented in
   `net/manager.py`.)
+- **(k)** The wiring lives in a new module `src/meshsync/node.py` (not listed in §8.2). It defines
+  the `typing.Protocol`s for the sync and transfer components and the `Action` type.
+- **(l)** Own `peer_id`: 8 uppercase hex chars from `secrets.token_hex(4).upper()`, created on
+  first run and kept in `<sync_dir>/.meshsync/peer_id`, reused afterwards.
 
 ## Changelog
 
@@ -263,3 +279,4 @@ the connection after sending ERROR.
 | 2026-11-07 | Decision (g): HMAC input encoding; REQ_ID 0 during handshake (#4) |
 | 2026-11-07 | §3 REQ_ID odd/even by role (h); §6 cert-CN check in `establish()`; §7 states, ILLEGAL_STATE after auth, unsupported type → INTERNAL (i) (#2) |
 | 2026-11-07 | §8a peer management: dial rule, duplicate-link rule (j), liveness, reconnect (#3) |
+| 2026-11-08 | §8b node wiring: peer_up → INDEX exchange → SYNCED; decisions (k), (l) (#40) |
