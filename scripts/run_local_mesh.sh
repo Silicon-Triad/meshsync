@@ -44,10 +44,23 @@ if [ "$clean" -eq 1 ]; then
 fi
 mkdir -p "$base"
 
+# --- Shutdown: kill every peer and wait for it ------------------------------------------------
+# Installed before anything starts, so Ctrl-C during cert generation or startup cleans up too.
+declare -A name_of  # pid -> peer name
+pids=()
+stop_all() {
+    if [ "${#pids[@]}" -gt 0 ]; then kill "${pids[@]}" 2>/dev/null || true; fi
+    wait 2>/dev/null || true
+}
+trap 'stop_all; echo stopped; exit 130' INT
+trap 'stop_all; echo stopped; exit 143' TERM
+
 # --- Shared secret: 32 random bytes as hex, the format net/auth.py reads (D4) -----------------
+# Written to key.tmp and moved only on success, so a failed run never leaves an empty key.
 if [ ! -f "$base/key" ]; then
     (umask 077 && python -c 'import secrets; from meshsync.net.auth import SECRET_BYTES
-print(secrets.token_hex(SECRET_BYTES))' >"$base/key")
+print(secrets.token_hex(SECRET_BYTES))' >"$base/key.tmp")
+    mv "$base/key.tmp" "$base/key"
 fi
 
 # --- TLS certs (D9): one dir holds every peer's key; fine for local tests only ------------------
@@ -63,8 +76,6 @@ else
 fi
 
 # --- Start peers in the background ------------------------------------------------------------
-declare -A name_of  # pid -> peer name
-pids=()
 for k in $(seq 1 "$n"); do
     dir="$base/peer$k"
     mkdir -p "$dir/data"
@@ -86,14 +97,6 @@ for k in $(seq 1 "$n"); do
     printf '%-8s %-6s %-40s %s\n' "peer$k" "$((tcp_base + k))" "$base/peer$k/data" \
         "$base/peer$k/peer.log"
 done
-
-# --- Shutdown: kill every peer and wait for it ------------------------------------------------
-stop_all() {
-    kill "${pids[@]}" 2>/dev/null || true
-    wait 2>/dev/null || true
-}
-trap 'stop_all; echo stopped; exit 130' INT
-trap 'stop_all; echo stopped; exit 143' TERM
 
 # --- Wait: peers should run until Ctrl-C; any exit stops the mesh -----------------------------
 rc=0
