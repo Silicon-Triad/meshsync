@@ -16,6 +16,12 @@ meshsync status
 meshsync stats
 ```
 
+### Local testing
+
+`scripts/run_local_mesh.sh [-n 3] [--tls] [--clean] [--base-dir ./.localmesh]` starts N peers on
+this machine (TCP 47001..4700N, shared UDP 47000), each with its own `--dir` and log under
+`.localmesh/peerK/`. Ctrl-C stops them all; `--clean` wipes `.localmesh/` first.
+
 ### TLS mode
 
 With `--tls`, every TCP connection is wrapped in TLS 1.3 with mutual certificates from the group
