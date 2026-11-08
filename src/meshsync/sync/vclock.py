@@ -8,8 +8,6 @@ Contract (PROJECT_CONTEXT.md §8.3):
 A vector maps peer_id -> counter (§7.1). A peer missing from a vector counts as 0, so
 {"A1F3C9D2": 0} equals {}. Functions never mutate their arguments.
 """
-# FROZEN INTERFACE (AGENTS.md §6): changing or adding to the public interface in this file
-# needs an issue and approval from all three members first (R-6.2).
 
 from typing import Literal
 
