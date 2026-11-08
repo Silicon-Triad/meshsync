@@ -1,15 +1,17 @@
 """CLI entry point: meshsync run / status / stats (§14).
 
 Owner: Muhammad Ahmed Qazi (CS-24045)
-Status: argument parsing and config loading done (#6); node wiring comes later.
+Status: argument parsing, config loading (#6) and node wiring (#40) done.
 """
 
 import argparse
 import logging
 import sys
+import threading
 from pathlib import Path
 
 from meshsync.config import CHUNKING_MODES, ConfigError, load_config
+from meshsync.node import ComponentsMissing, build_node
 from meshsync.protocol.constants import TCP_PORT, UDP_PORT
 
 log = logging.getLogger(__name__)
@@ -59,8 +61,22 @@ def main(argv: list[str] | None = None) -> int:
 
     logging.getLogger().setLevel(config.log_level)
     log.info("config: %s", config)  # holds the secret's path only, never its contents
-    print("meshsync run: node not implemented yet (see wiring issue)", file=sys.stderr)
-    return 1
+    try:
+        node = build_node(config)
+    except ComponentsMissing as e:
+        log.debug("components missing: %s", e)
+        print(
+            "meshsync: sync/transfer modules not implemented yet (issues #9-#16)", file=sys.stderr
+        )
+        return 1
+    node.start()
+    try:
+        threading.Event().wait()  # run until Ctrl-C
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.stop()
+    return 0
 
 
 if __name__ == "__main__":
