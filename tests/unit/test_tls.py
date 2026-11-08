@@ -3,7 +3,6 @@
 import shutil
 import socket
 import ssl
-import subprocess
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -17,25 +16,7 @@ from meshsync.protocol.framing import recv_msg, send_msg
 if shutil.which("openssl") is None:
     pytest.skip("openssl not on PATH; needed by scripts/gen_certs.sh", allow_module_level=True)
 
-GEN_CERTS = Path(__file__).resolve().parents[2] / "scripts" / "gen_certs.sh"
 TIMEOUT = 5  # test-only socket timeout, so a failure never hangs the suite
-
-
-def _gen(outdir: Path, *names: str) -> Path:
-    subprocess.run(["bash", str(GEN_CERTS), str(outdir), *names], check=True, capture_output=True)
-    return outdir
-
-
-@pytest.fixture(scope="session")
-def certs(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Group CA + alice + bob in a throwaway dir (never ~/.meshsync or real team certs)."""
-    return _gen(tmp_path_factory.mktemp("certs"), "alice", "bob")
-
-
-@pytest.fixture(scope="session")
-def rogue(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A different CA with member 'mallory'; bob must not trust it."""
-    return _gen(tmp_path_factory.mktemp("rogue"), "mallory")
 
 
 def _run_pair(

@@ -23,6 +23,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
+from meshsync.net.auth import PeerIdentity
 from meshsync.protocol.constants import (
     ANNOUNCE_INTERVAL,
     ANNOUNCE_MAX_SKEW,
@@ -35,14 +36,6 @@ from meshsync.protocol.constants import (
 from meshsync.protocol.messages import canonical_json, decode_announce, encode_announce
 
 log = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True)
-class PeerIdentity:
-    """Who we are. Minimal local copy until net/auth.py defines the shared one (dedupe later)."""
-
-    peer_id: str
-    name: str
 
 
 @dataclass
