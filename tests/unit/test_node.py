@@ -5,6 +5,7 @@ import socket
 import time
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -18,12 +19,14 @@ from fakes import (
     sha,
 )
 from meshsync import __main__ as cli
+from meshsync import node as node_mod
 from meshsync.net import manager
 from meshsync.net.auth import PeerIdentity
-from meshsync.net.connection import RemoteError, State
+from meshsync.net.connection import Connection, RemoteError, State
 from meshsync.net.manager import PeerManager
 from meshsync.node import Node, load_or_create_peer_id
 from meshsync.protocol.constants import ErrorCode, MsgType
+from meshsync.protocol.framing import send_msg
 
 KEY = bytes(range(32))
 ALICE = PeerIdentity("A1F3C9D2", "alice")  # lower id: dials
@@ -195,3 +198,43 @@ def test_run_with_unimplemented_modules_exits_1(
     )  # fmt: skip
     assert rc == 1
     assert "sync/transfer modules not implemented yet" in capsys.readouterr().err
+
+
+def test_handle_remote_after_stop_does_not_raise(sides: list[Side]) -> None:
+    a, _ = pair(sides)
+    a.node.stop()
+    entry = make_entry("late.txt", [b"x"], {BOB.peer_id: 1})
+    a.node._handle_remote(BOB.peer_id, entry)  # must not raise RuntimeError
+    assert a.index.get("late.txt") is None
+
+
+def test_index_timeout_still_marks_synced(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(node_mod, "HANDSHAKE_TIMEOUT", 0.1)
+    side = Side(BOB)
+    sa, sb = socket.socketpair()
+    sa.settimeout(WAIT)
+    conn = Connection(sb, ALICE, False)
+    conn.start()  # the scripted peer on `sa` never answers INDEX_REQ
+    try:
+        peer = SimpleNamespace(peer_id=ALICE.peer_id, conn=conn)
+        side.node._exchange_index(peer)  # type: ignore[arg-type]
+        assert conn.state is State.SYNCED
+    finally:
+        conn.close("test")
+        sa.close()
+
+
+def test_malformed_notify_closes_link_and_never_reaches_engine() -> None:
+    side = Side(BOB)
+    sa, sb = socket.socketpair()
+    sa.settimeout(WAIT)
+    conn = Connection(sb, ALICE, False)
+    conn.on(MsgType.NOTIFY, side.node._on_notify)
+    conn.start()
+    try:
+        send_msg(sa, MsgType.NOTIFY, 1, b"{}")  # no "entry": decode_body rejects it (BAD_HEADER)
+        assert wait_until(lambda: conn.closed)
+        assert side.engine.applied == [] and side.engine.fetched == []
+    finally:
+        conn.close("test")
+        sa.close()

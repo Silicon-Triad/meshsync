@@ -221,23 +221,32 @@ class Node:
         ).start()
 
     def _exchange_index(self, peer: PeerInfo) -> None:
+        # 10 s (HANDSHAKE_TIMEOUT) is enough: INDEX is at most MAX_BODY (1 MiB) on the wire.
+        # If the exchange fails the link must not stay AUTHENTICATED forever, so it is marked
+        # SYNCED anyway; NOTIFY keeps delivering changes and the next reconnect retries INDEX.
         try:
             msg_type, body = peer.conn.request(MsgType.INDEX_REQ, {}).result(HANDSHAKE_TIMEOUT)
             if msg_type != MsgType.INDEX:
                 raise ValueError(f"expected INDEX, got {msg_type!r}")
             for entry in body["files"]:
                 self._handle_remote(peer.peer_id, entry)
-            peer.conn.mark_synced()
         except Exception:  # noqa: BLE001 - any failure here only affects this one peer
-            log.exception("index exchange with %s failed", peer.peer_id)
+            log.warning("index exchange with %s failed", peer.peer_id, exc_info=True)
+        finally:
+            peer.conn.mark_synced()  # no-op unless the link is still AUTHENTICATED
 
     def _handle_remote(self, peer_id: str, entry: dict) -> None:
+        if self._stopped:
+            return
         action = self.engine.on_remote_entry(peer_id, entry)
-        if action.kind == "fetch":
-            self._pool.submit(self._fetch, action.entry)
-        elif action.kind in ("conflict", "delete"):
-            self._pool.submit(self._apply, action)
-        # "skip": nothing to do
+        try:
+            if action.kind == "fetch":
+                self._pool.submit(self._fetch, action.entry)
+            elif action.kind in ("conflict", "delete"):
+                self._pool.submit(self._apply, action)
+            # "skip": nothing to do
+        except RuntimeError:  # pool shut down by stop() while this reader thread was running
+            log.debug("dropping %s for %s: node is stopping", action.kind, entry.get("path"))
 
     def _fetch(self, entry: dict) -> None:
         try:
