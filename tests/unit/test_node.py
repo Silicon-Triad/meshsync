@@ -238,3 +238,12 @@ def test_malformed_notify_closes_link_and_never_reaches_engine() -> None:
     finally:
         conn.close("test")
         sa.close()
+
+
+@pytest.mark.parametrize("body", [{}, None, [], {"entry": None}, {"entry": "x"}])
+def test_on_notify_drops_malformed_body(body: object) -> None:
+    side = Side(BOB)
+    conn = SimpleNamespace(remote=ALICE)
+    side.node._on_notify(conn, 1, body)  # type: ignore[arg-type]  # must not raise
+    assert side.engine.applied == [] and side.engine.fetched == []
+    assert side.index.entries() == []

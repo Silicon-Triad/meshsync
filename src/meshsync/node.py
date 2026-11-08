@@ -198,7 +198,12 @@ class Node:
         )
 
     def _on_notify(self, conn: Connection, req_id: int, body: Any) -> None:
-        self._handle_remote(conn.remote.peer_id, body["entry"])
+        # decode_body already checks this (fatal BAD_HEADER); stay safe if a caller skips it.
+        entry = body.get("entry") if isinstance(body, dict) else None
+        if not isinstance(entry, dict):
+            log.warning("dropping malformed NOTIFY from %s", conn.remote.peer_id)
+            return
+        self._handle_remote(conn.remote.peer_id, entry)
 
     def _on_chunk_req(self, conn: Connection, req_id: int, body: Any) -> None:
         try:
