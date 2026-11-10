@@ -22,3 +22,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-10 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | chunker (#9): sync/chunker.py, tests/unit/test_chunker.py | |
 | 2026-11-10 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | local index (#10): sync/index.py, tests/unit/test_index.py | |
 | 2026-11-11 | Muhammad Ahmed Qazi | Claude Code (Opus 5.5) | conflict fetch before apply (#49): node.py, tests/fakes.py, tests/unit/test_node.py | |
+| 2026-11-10 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | polling scanner (#12): sync/scanner.py, tests/unit/test_scanner.py | |
