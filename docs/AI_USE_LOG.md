@@ -18,3 +18,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-08 | Muhammad Ahmed Qazi | Claude Code (Opus 5.5) | local mesh script (#7): scripts/run_local_mesh.sh, .gitignore, README local testing | |
 | 2026-11-08 | Muhammad Ahmed Qazi | Claude Code (Opus 5.5) | PROTOCOL.md consolidation (#8): rewrite as one spec, worked examples generated from the code | |
 | 2026-11-08 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | version vectors (#13): sync/vclock.py, tests/unit/test_vclock.py | |
+| 2026-11-08 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | chunk store (#11): sync/store.py, tests/unit/test_store.py | |
