@@ -36,15 +36,18 @@ import logging
 import socket
 import ssl
 import threading
+import time
 from collections.abc import Callable
 from concurrent.futures import Future, InvalidStateError
 from enum import Enum
 from typing import Any
 
+from meshsync.metrics import logger as metrics
 from meshsync.net import auth, tls
 from meshsync.net.auth import PeerIdentity
 from meshsync.protocol.constants import (
     FATAL_ERRORS,
+    HEADER_SIZE,
     MAX_MISSED_PONGS,
     MAX_REQ_ID,
     PING_INTERVAL,
@@ -251,6 +254,7 @@ class Connection:
     def _send_raw(self, msg_type: MsgType, req_id: int, data: bytes) -> None:
         with self._send_lock:  # the only place that writes to the socket (§9.1)
             send_msg(self._sock, msg_type, req_id, data)
+        self._record("send", msg_type, data)
 
     def _write(self, msg_type: MsgType, req_id: int, data: bytes) -> None:
         try:
@@ -299,11 +303,22 @@ class Connection:
             log.debug("sender busy, skipping BYE")
             return
         try:
-            send_msg(self._sock, MsgType.BYE, 0, encode_body(MsgType.BYE, {"reason": reason}))
+            data = encode_body(MsgType.BYE, {"reason": reason})
+            send_msg(self._sock, MsgType.BYE, 0, data)
+            self._record("send", MsgType.BYE, data)
         except OSError as e:
             log.debug("could not send BYE: %s", e)
         finally:
             self._send_lock.release()
+
+    def _record(self, direction: str, msg_type: MsgType, data: bytes) -> None:
+        """Per-message metrics, bytes on the wire (§8.3, §11, #17). Never breaks the link."""
+        try:
+            metrics.record(
+                direction, self._remote.name, msg_type.name, HEADER_SIZE + len(data), time.time()
+            )
+        except Exception:
+            log.exception("metrics.record failed")
 
     def _run_callback(self, fn: CloseCallback, reason: str) -> None:
         try:
@@ -317,6 +332,7 @@ class Connection:
         try:
             while not self.closed:
                 msg_type, req_id, data = recv_msg(self._sock)
+                self._record("recv", msg_type, data)
                 self._dispatch(msg_type, req_id, decode_body(msg_type, data))
         except ProtocolError as e:
             log.warning("protocol error from %s: %s", self._remote.name, e)
