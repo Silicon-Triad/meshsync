@@ -144,3 +144,35 @@ def test_cli_rejects_bad_sets_and_seed(tmp_path: Path) -> None:
 
 def test_sets_parser_accepts_commas() -> None:
     assert gt._sets("a, d") == "AD"
+
+
+def test_subset_runs_merge_manifest(tmp_path: Path) -> None:
+    # #58 review: --sets B,F then --sets C into the same folder must keep B and F's lines.
+    gt.generate(tmp_path, 3, "BF", SMALL)
+    gt.generate(tmp_path, 3, "C", SMALL)
+    rels = [ln.split("  ", 1)[1] for ln in (tmp_path / gt.MANIFEST).read_text().splitlines()]
+    assert rels == sorted(rels)
+    assert {"sizes/0k.bin", "deletes/d00.bin", "small/f0000.bin"} <= set(rels)
+    assert len(rels) == 2 + 2 + 3
+
+
+def test_rerun_replaces_lines_not_duplicates(tmp_path: Path) -> None:
+    gt.generate(tmp_path, 3, "F", SMALL)
+    gt.generate(tmp_path, 4, "F", SMALL)
+    lines = (tmp_path / gt.MANIFEST).read_text().splitlines()
+    assert len(lines) == 2
+    for line in lines:
+        digest, rel = line.split("  ", 1)
+        assert hashlib.sha256(_read(tmp_path, rel)).hexdigest() == digest
+
+
+# Digest of MANIFEST.sha256 for SMALL with seed 0. Pins the byte construction so every laptop and
+# Python version (CI: 3.11, 3.12) produces identical data. If this changes, all three laptops must
+# regenerate their data and #25 must be updated (#58 review).
+GOLDEN_MANIFEST_SHA256 = "a86c71956b418742d0c0e642b8101444875def1165cc70ef7f7c04edaa5f750b"
+
+
+def test_golden_digest(tmp_path: Path) -> None:
+    gt.generate(tmp_path, 0, spec=SMALL)
+    digest = hashlib.sha256((tmp_path / gt.MANIFEST).read_bytes()).hexdigest()
+    assert digest == GOLDEN_MANIFEST_SHA256

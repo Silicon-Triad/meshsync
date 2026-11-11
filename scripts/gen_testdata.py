@@ -13,7 +13,8 @@ Sets (issue #25 v2; sizes in MiB/KiB, "100 MiB" stands for §11's "100 MB"):
   F  deletes/dNN.bin           10 x 4 KiB random; §10 demos delete these (generator only creates)
 
 Bytes are SHA-256(file_seed || counter) blocks (hashlib), so the output is identical on every
-Python version. Writes OUT_DIR/MANIFEST.sha256 (sha256sum format). Never commit the output.
+Python version. Writes OUT_DIR/MANIFEST.sha256 (sha256sum format), merged across subset
+runs. Never commit the output.
 Owner: Huzaifa Hanif (CS-24039); written by Mujtaba Jawaid Rao (CS-24047). Issue #19.
 """
 
@@ -162,7 +163,16 @@ def generate(out: Path, seed: int, sets: str = ALL_SETS, spec: Spec | None = Non
                 f.write(piece)
         lines.append(f"{h.hexdigest()}  {rel}")
     lines.sort(key=lambda line: line.split("  ", 1)[1])
-    (out / MANIFEST).write_text("".join(f"{line}\n" for line in lines))
+    # Merge with an existing manifest so subset runs (e.g. A now, the rest later) keep the
+    # lines of sets generated earlier; this run's files replace their old lines (#58 review).
+    manifest = out / MANIFEST
+    merged: dict[str, str] = {}
+    if manifest.exists():
+        for line in manifest.read_text().splitlines():
+            if "  " in line:
+                merged[line.split("  ", 1)[1]] = line
+    merged.update((line.split("  ", 1)[1], line) for line in lines)
+    manifest.write_text("".join(f"{merged[rel]}\n" for rel in sorted(merged)))
     return lines
 
 
