@@ -66,7 +66,7 @@ bash -n scripts/*.sh             # shell syntax check
 scripts/gen_certs.sh certs ahmed mujtaba huzaifa   # TLS certs (never commit)
 ```
 
-Not yet available: `scripts/run_local_mesh.sh` (added by #7), `scripts/netem.sh` (added by #18),
+Not yet available: `scripts/run_local_mesh.sh` (added by #7),
 `scripts/gen_testdata.py` (added by #19), `scripts/measure/` runners (added by #20).
 `tests/integration/` is empty (no issue yet).
 
