@@ -307,6 +307,9 @@ def build_node(config: Config) -> Node:
         scanner = Scanner(config, index)
     except (ImportError, NotImplementedError) as e:
         raise ComponentsMissing(str(e)) from e
-    return Node(
+    node = Node(
         config, index=index, store=store, engine=engine, scheduler=scheduler, scanner=scanner
     )
+    engine.on_change = node._on_local_change  # issue #14 point 3: resolved conflicts -> NOTIFY
+    engine.lock = scanner.lock = threading.RLock()  # #14: one lock for engine and scanner
+    return node

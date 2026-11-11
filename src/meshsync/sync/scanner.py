@@ -17,6 +17,11 @@ just assembled) is not a change, so remote writes are not echoed back as local e
 
 A changed file's chunks are put in the chunk store, so peers can fetch them with CHUNK_REQ, then
 the entry is stored in the index and passed to on_change (node.ScannerLike).
+
+`lock` is shared with the engine (build_node sets both to one lock, issue #14). The scanner holds
+it only across index.get, the compare and index.put; the slow chunking and hashing run outside
+it. Under the lock the file is stat'ed again, so a file the engine replaced after we read it is
+not reported as a local edit, and a file the engine created after the walk is not tombstoned.
 """
 
 import hashlib
@@ -67,6 +72,7 @@ class Scanner:
         self._cache_path = self.root / META_DIR / _CACHE_FILE
         # path -> (size, mtime_ns, file_hash) when last scanned; persisted across restarts (#51)
         self._seen: dict[str, tuple[int, int, str]] = self._load_cache()
+        self.lock: threading.RLock = threading.RLock()  # shared with the engine (#14)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._on_change: Callable[[dict], None] | None = None
@@ -118,7 +124,7 @@ class Scanner:
             cached = self._seen.get(rel)
             if cached is not None and cached[:2] == key:
                 continue
-            result = self._scan_file(rel)
+            result = self._scan_file(rel, st)
             if result is None:
                 continue
             entry, file_hash = result
@@ -130,8 +136,12 @@ class Scanner:
                 del self._seen[path]
         if self._seen != before:
             self._save_cache()
-        for old in self.index.entries():
-            if not old["deleted"] and old["path"] not in present:
+        with self.lock:
+            for old in self.index.entries():
+                if old["deleted"] or old["path"] in present:
+                    continue
+                if os.path.lexists(self.root / old["path"]):
+                    continue  # appeared after the walk (e.g. the engine wrote it): next poll
                 entry = self._make_entry(old["path"], 0, EMPTY_FILE_HASH, [], deleted=True)
                 if self._put(entry):
                     changed.append(entry)
@@ -155,19 +165,23 @@ class Scanner:
                     found.append(((rel_dir / name).as_posix(), st))
         return found
 
-    def _scan_file(self, rel: str) -> "tuple[dict | object, str] | None":
+    def _scan_file(self, rel: str, st: os.stat_result) -> "tuple[dict | object, str] | None":
         """(new entry, or _UNCHANGED, and the file_hash read), or None to retry next poll."""
         try:
-            size, file_hash, chunks = self._read(rel)
+            size, file_hash, chunks = self._read(rel)  # slow: outside the lock
         except (OSError, _FileChanged) as e:
             log.info("skipping %s this poll: %s", rel, e)
             return None
-        old = self.index.get(rel)
-        if old is not None and not old["deleted"] and old["file_hash"] == file_hash:
-            return _UNCHANGED, file_hash
-        entry = self._make_entry(rel, size, file_hash, chunks, deleted=False)
-        # A rejected path is remembered as seen, so it is not re-read and logged every poll.
-        return (entry if self._put(entry) else _UNCHANGED), file_hash
+        with self.lock:
+            if not _same_file(self.root / rel, st):
+                # Replaced while we read it (e.g. by the engine): what we read is stale.
+                return None
+            old = self.index.get(rel)
+            if old is not None and not old["deleted"] and old["file_hash"] == file_hash:
+                return _UNCHANGED, file_hash
+            entry = self._make_entry(rel, size, file_hash, chunks, deleted=False)
+            # A rejected path is remembered as seen, so it is not re-read and logged every poll.
+            return (entry if self._put(entry) else _UNCHANGED), file_hash
 
     def _read(self, rel: str) -> tuple[int, str, list[str]]:
         """Chunk the file, put its chunks in the store and return (size, file_hash, chunks)."""
@@ -269,3 +283,12 @@ class Scanner:
 
 
 _UNCHANGED = object()
+
+
+def _same_file(path: Path, st: os.stat_result) -> bool:
+    """True if path is still the file described by st (not replaced or modified)."""
+    try:
+        now = path.lstat()
+    except FileNotFoundError:
+        return False
+    return (now.st_ino, now.st_size, now.st_mtime_ns) == (st.st_ino, st.st_size, st.st_mtime_ns)

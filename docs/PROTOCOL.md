@@ -610,9 +610,9 @@ implementation is in an open issue (`sync/` #9–#14, `transfer/` #15–#16).
 | ----- | ----- | ------ |
 | Entry and path validation on receipt (9.1, 9.2) | `protocol/messages.py` | done |
 | INDEX / NOTIFY / CHUNK_REQ wiring (9.6) | `node.py` | done |
-| Scanner, index file, chunker | `sync/scanner.py`, `index.py`, `chunker.py` | pending |
-| Version-vector compare, conflicts, tombstones (9.3–9.5) | `sync/vclock.py`, `engine.py` | pending |
-| Chunk store (9.7) | `sync/store.py` | pending |
+| Scanner, index file, chunker | `sync/scanner.py`, `index.py`, `chunker.py` | done |
+| Version-vector compare, conflicts, tombstones (9.3–9.5) | `sync/vclock.py`, `engine.py` | done |
+| Chunk store (9.7) | `sync/store.py` | done |
 | Scheduler, assembly (9.8) | `transfer/scheduler.py`, `assembler.py` | pending |
 
 ### 9.1 Index entry
@@ -663,12 +663,44 @@ zeros):
 
 ### 9.4 Conflicts
 
-On a concurrent pair, the version written by the peer with the **higher `peer_id`** keeps the
-original name. The other version is saved, on all peers, as `name.conflict-<peername>.ext`
-(PROJECT_CONTEXT §7.2). The exact rule for filling `<peername>` and for names without an
-extension will be fixed by the engine issue (pending). The surviving entry's version is the element-wise
-maximum of both vectors, then the resolving peer increments its own counter, and the result is
-sent as NOTIFY like any edit. No data is lost.
+On a concurrent pair, one version keeps the original name and the other is saved, on all
+peers, as a conflict copy (PROJECT_CONTEXT §7.2). The rules below were fixed in issue #14 and
+use only the two version vectors, so every peer gets the same answer, even when an entry was
+relayed by a peer that did not write it.
+
+**Who keeps the name.** For each version, list the `peer_id`s where it has the higher counter
+(both lists are non-empty, because the versions are concurrent). The version whose list contains
+the overall highest `peer_id` keeps the original name. That `peer_id` is the **resolver**.
+
+**Conflict copy name.** `<peername>` is the highest `peer_id` in the losing version's list. The
+tag `.conflict-<peername>` goes before the last dot of the file name (the last path segment),
+unless that dot is its first character; otherwise it is appended:
+
+| Original | Conflict copy |
+| -------- | ------------- |
+| `report.txt` | `report.conflict-A1F3C9D2.txt` |
+| `a.tar.gz` | `a.tar.conflict-A1F3C9D2.gz` |
+| `Makefile` | `Makefile.conflict-A1F3C9D2` |
+| `.bashrc` | `.bashrc.conflict-A1F3C9D2` |
+| `docs/v1.2/notes.md` | `docs/v1.2/notes.conflict-A1F3C9D2.md` |
+
+A tombstone has no content, so a losing tombstone leaves no copy; a winning tombstone deletes
+the original name after the other version is saved as the copy. The copy is then picked up by
+the scanner like any new file.
+
+**Version of the surviving entry.** Every peer stores the element-wise maximum of both vectors.
+Only the resolver then increments its own counter and sends the result as NOTIFY like any edit;
+the other peers do not bump, so the resolver's NOTIFY dominates their entry and there is no
+loop. If the resolver is offline, every peer still has both files, and the resolver settles the
+entry when it reconnects. No data is lost.
+
+**Same content.** Two concurrent entries with the same `file_hash` (and the same `deleted`) are
+not a conflict: the vectors are merged and no copy is made. This also stops a second round of
+conflicts when every peer writes the same conflict copy.
+
+**Known limitation.** If the conflict name already exists, the copy is written over it as a
+normal edit to that path (the newer copy replaces the older one). A numbered suffix is not used
+because peers could pick different numbers.
 
 ### 9.5 Tombstones
 
