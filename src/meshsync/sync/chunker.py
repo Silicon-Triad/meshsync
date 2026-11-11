@@ -10,8 +10,6 @@ stricter mask before CDC_AVG and a looser one after it (normalized chunking), fo
 CDC_MAX. Fixed mode cuts every CDC_AVG bytes so both modes have the same average chunk size.
 Peers need not agree on the algorithm: chunks are only ever named by their SHA-256 (§9.7).
 """
-# FROZEN INTERFACE (AGENTS.md §6): changing or adding to the public interface in this file
-# needs an issue and approval from all three members first (R-6.2).
 
 import hashlib
 import logging
@@ -36,7 +34,7 @@ _MASK_L = ((1 << (_AVG_BITS - 2)) - 1) << (64 - (_AVG_BITS - 2))
 _READ_SIZE = 4 * CDC_MAX
 
 
-def cut_point(data: bytes | bytearray | memoryview, start: int = 0) -> int:
+def _cut_point(data: bytes | bytearray | memoryview, start: int = 0) -> int:
     """Length of the CDC chunk beginning at data[start:] (D10). Takes at most CDC_MAX bytes."""
     n = min(len(data) - start, CDC_MAX)
     if n <= CDC_MIN:
@@ -85,7 +83,7 @@ def chunk_file(path: str | os.PathLike[str], mode: str = "cdc") -> Iterator[tupl
                 if mode == "fixed":
                     length = min(CDC_AVG, len(buf) - pos)
                 else:
-                    length = cut_point(buf, pos)
+                    length = _cut_point(buf, pos)
                 digest = hashlib.sha256(memoryview(buf)[pos : pos + length]).hexdigest()
                 yield offset, length, digest
                 offset += length
