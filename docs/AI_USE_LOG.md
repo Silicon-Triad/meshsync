@@ -19,5 +19,6 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-08 | Muhammad Ahmed Qazi | Claude Code (Opus 5.5) | PROTOCOL.md consolidation (#8): rewrite as one spec, worked examples generated from the code | |
 | 2026-11-08 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | version vectors (#13): sync/vclock.py, tests/unit/test_vclock.py | |
 | 2026-11-08 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | chunk store (#11): sync/store.py, tests/unit/test_store.py | |
+| 2026-11-10 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | chunker (#9): sync/chunker.py, tests/unit/test_chunker.py | |
 | 2026-11-10 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | local index (#10): sync/index.py, tests/unit/test_index.py | |
 | 2026-11-11 | Muhammad Ahmed Qazi | Claude Code (Opus 5.5) | conflict fetch before apply (#49): node.py, tests/fakes.py, tests/unit/test_node.py | |
