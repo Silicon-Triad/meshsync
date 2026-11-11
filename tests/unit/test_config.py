@@ -6,8 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from meshsync import __main__ as cli
 from meshsync.__main__ import build_parser, main
 from meshsync.config import ConfigError, load_config
+from meshsync.node import ComponentsMissing
 from meshsync.protocol.constants import TCP_PORT, UDP_PORT
 
 
@@ -112,7 +114,13 @@ def test_tls_and_plain_exclusive(env):
     assert e.value.code == 2
 
 
-def test_main_exit_codes(env):
+def test_main_exit_codes(env, monkeypatch):
+    # Force the "missing module" path: once the engine (#14) and scheduler (#15) both exist,
+    # the real build_node succeeds and `run` would start a node.
+    def missing(config):
+        raise ComponentsMissing("engine")
+
+    monkeypatch.setattr(cli, "build_node", missing)
     assert main(args_for(env)) == 1
     assert main(args_for(env, "--name", "BAD")) == 2
     assert main(["status"]) == 1
