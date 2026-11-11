@@ -13,7 +13,12 @@ set -euo pipefail
 LOSS_DEFAULT_PCT=5 # §10: "5 % loss via netem"
 
 usage() {
-  sed -n '6,10p' "$0" | sed 's/^# \{0,1\}//' >&2
+  cat >&2 <<'USAGE'
+Usage: scripts/netem.sh apply IFACE loss [PCT]   # default PCT 5 (§10), 0-100
+       scripts/netem.sh apply IFACE delay MS      # MS required; §11 gives no value
+       scripts/netem.sh clear IFACE               # back to a clean link
+       scripts/netem.sh show IFACE
+USAGE
   exit 2
 }
 
@@ -38,7 +43,10 @@ case "$cmd" in
     case "$profile" in
       loss)
         pct="${4:-$LOSS_DEFAULT_PCT}"
-        is_number "$pct" || { echo "netem.sh: bad loss percent: $pct" >&2; exit 2; }
+        if ! is_number "$pct" || awk -v p="$pct" 'BEGIN { exit !(p > 100) }'; then
+          echo "netem.sh: bad loss percent (0-100): $pct" >&2
+          exit 2
+        fi
         run tc qdisc replace dev "$iface" root netem loss "${pct}%"
         ;;
       delay)
@@ -54,8 +62,12 @@ case "$cmd" in
     esac
     ;;
   clear)
-    # Deleting a root qdisc that does not exist fails; a clean link is the goal either way.
-    run tc qdisc del dev "$iface" root 2>/dev/null || true
+    # Delete only when a netem qdisc is present; a failing tc (no sudo, bad iface) must fail
+    # loudly so a "clean link" run is never silently impaired. The query always runs for real.
+    current="$(tc qdisc show dev "$iface")"
+    if grep -q netem <<<"$current"; then
+      run tc qdisc del dev "$iface" root
+    fi
     ;;
   show)
     run tc qdisc show dev "$iface"
