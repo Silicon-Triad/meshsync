@@ -347,3 +347,14 @@ def test_concurrent_calls_are_safe(tmp_path: Path) -> None:
     for t in threads:
         t.join()
     assert len(s.index.entries()) == 20
+
+
+def test_real_assembler_conflict(tmp_path: Path) -> None:
+    """End to end with transfer/assembler.assemble (#16) instead of the fake."""
+    s = Setup(tmp_path, me=A)
+    s.engine._assemble = None  # load the real one lazily, as build_node does
+    s.local("report.txt", b"mine", {A: 1})
+    s.engine.apply(Action("conflict", s.entry("report.txt", b"theirs", {B: 1})))
+    assert (tmp_path / "report.txt").read_bytes() == b"theirs"
+    assert (tmp_path / f"report.conflict-{A}.txt").read_bytes() == b"mine"
+    assert s.index.get("report.txt")["version"] == {A: 1, B: 1}
