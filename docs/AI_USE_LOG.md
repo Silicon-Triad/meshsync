@@ -27,3 +27,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-11 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | persisted scan cache (#51): sync/scanner.py, tests/unit/test_scanner.py | |
 | 2026-11-11 | Huzaifa Hanif | Claude Code (Opus 5.5) | chunk scheduler (#15): transfer/scheduler.py, tests/unit/test_scheduler.py | |
 | 2026-11-11 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | sync engine (#14): sync/engine.py, tests/unit/test_engine.py, build_node on_change line, PROTOCOL.md §9.4 conflict rules | |
+| 2026-11-11 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | test data generator (#19): scripts/gen_testdata.py, tests/unit/test_gen_testdata.py; data set proposal on #25 | |

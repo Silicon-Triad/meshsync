@@ -24,3 +24,6 @@ data/raw/
 
 # Local mesh test state (scripts/run_local_mesh.sh)
 .localmesh/
+
+# measurement test data (scripts/gen_testdata.py, #19)
+testdata/
