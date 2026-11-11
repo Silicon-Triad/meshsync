@@ -221,8 +221,14 @@ def test_slow_fetch_does_not_block_reader(sides: list[Side]) -> None:
 
 
 def test_run_with_unimplemented_modules_exits_1(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # Force the "missing module" path: once the engine (#14) and scheduler (#15) both exist,
+    # the real build_node succeeds and `run` would block forever.
+    def missing(config: object) -> None:
+        raise node_mod.ComponentsMissing("engine")
+
+    monkeypatch.setattr(cli, "build_node", missing)
     sync = tmp_path / "sync"
     sync.mkdir()
     key = tmp_path / "key"
