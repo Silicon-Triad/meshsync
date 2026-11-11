@@ -311,4 +311,5 @@ def build_node(config: Config) -> Node:
         config, index=index, store=store, engine=engine, scheduler=scheduler, scanner=scanner
     )
     engine.on_change = node._on_local_change  # issue #14 point 3: resolved conflicts -> NOTIFY
+    engine.lock = scanner.lock = threading.RLock()  # #14: one lock for engine and scanner
     return node

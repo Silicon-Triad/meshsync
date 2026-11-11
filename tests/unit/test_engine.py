@@ -323,19 +323,92 @@ def test_remote_tombstone_wins_conflict_keeps_copy(tmp_path: Path) -> None:
 
 def test_on_change_called_outside_lock(tmp_path: Path) -> None:
     s = Setup(tmp_path, me=B)
-    held: list[bool] = []
+    free: list[bool] = []
 
     def cb(entry: dict) -> None:
-        # The lock must be free: a callback that takes it would otherwise deadlock.
-        ok = s.engine._lock.acquire(blocking=False)
-        held.append(not ok)
-        if ok:
-            s.engine._lock.release()
+        # Another thread must be able to take the lock while on_change runs (R-4.7).
+        def probe() -> None:
+            ok = s.engine.lock.acquire(blocking=False)
+            free.append(ok)
+            if ok:
+                s.engine.lock.release()
+
+        t = threading.Thread(target=probe)
+        t.start()
+        t.join()
 
     s.engine.on_change = cb
     s.local("a.txt", b"mine", {B: 1})
     s.engine.apply(Action("conflict", s.entry("a.txt", b"theirs", {A: 1})))
-    assert held == [False]
+    assert free == [True]
+
+
+def test_local_edit_keeps_name_over_remote_tombstone(tmp_path: Path) -> None:
+    # Edit keeps the name: a deletion has no content, so no copy; the edit stays.
+    s = Setup(tmp_path, me=B)
+    s.local("a.txt", b"edited", {B: 1})
+    s.engine.apply(Action("conflict", tomb("a.txt", {A: 1})))
+    assert (tmp_path / "a.txt").read_bytes() == b"edited"
+    assert [p.name for p in tmp_path.iterdir() if p.is_file()] == ["a.txt"]
+    got = s.index.get("a.txt")
+    assert got["deleted"] is False and got["version"] == {A: 1, B: 2}
+    assert s.sent == [got]
+
+
+def test_remote_edit_keeps_name_over_local_tombstone(tmp_path: Path) -> None:
+    s = Setup(tmp_path, me=A)
+    s.index.put(tomb("a.txt", {A: 1}))  # we deleted it; file is gone
+    s.engine.apply(Action("conflict", s.entry("a.txt", b"edited", {B: 1})))
+    assert (tmp_path / "a.txt").read_bytes() == b"edited"
+    assert [p.name for p in tmp_path.iterdir() if p.is_file()] == ["a.txt"]
+    assert s.index.get("a.txt")["version"] == {A: 1, B: 1}
+
+
+def test_scanner_poll_during_assemble_is_not_an_edit(tmp_path: Path) -> None:
+    """#14: the scanner polls while the engine is assembling; no own-bumped entry."""
+    from meshsync.sync.scanner import Scanner
+
+    s = Setup(tmp_path, me=A)
+    cfg = Config(sync_dir=tmp_path, name="me", secret_file=tmp_path / "secret")
+    scanner = Scanner(cfg, s.index, peer_id=A)
+    s.engine.lock = scanner.lock = threading.RLock()  # as build_node does
+    s.local("a.txt", b"old", {B: 1})
+    scanner.scan_once()  # scanner has seen the old file
+    result: list[list[dict]] = []
+
+    def slow_assemble(root: Path, entry: dict, store: ChunkStore, dest: str | None = None) -> Path:
+        out = fake_assemble(root, entry, store, dest)  # file replaced on disk...
+        t = threading.Thread(target=lambda: result.append(scanner.scan_once()))
+        t.start()
+        t.join(0.3)  # ...and the scanner polls before index.put
+        return out
+
+    s.engine._assemble = slow_assemble
+    new = s.entry("a.txt", b"new!", {B: 2})
+    s.engine.on_fetched(new)
+    while not result:
+        threading.Event().wait(0.01)
+    assert result == [[]]
+    assert s.index.get("a.txt") == new
+    assert scanner.scan_once() == []
+
+
+def test_scanner_does_not_tombstone_file_written_after_walk(tmp_path: Path) -> None:
+    from meshsync.sync.scanner import Scanner
+
+    s = Setup(tmp_path, me=A)
+    cfg = Config(sync_dir=tmp_path, name="me", secret_file=tmp_path / "secret")
+    scanner = Scanner(cfg, s.index, peer_id=A)
+    walk = scanner._walk
+
+    def walk_then_engine_writes() -> list:
+        found = walk()  # file not there yet
+        s.engine.on_fetched(s.entry("n.txt", b"new", {B: 1}))
+        return found
+
+    scanner._walk = walk_then_engine_writes  # type: ignore[method-assign]
+    assert scanner.scan_once() == []
+    assert s.index.get("n.txt")["deleted"] is False
 
 
 def test_concurrent_calls_are_safe(tmp_path: Path) -> None:

@@ -9,6 +9,7 @@ Contract (PROJECT_CONTEXT.md §8.3):
     Engine.apply(action), Engine.on_fetched(entry) (node.EngineLike).
     Engine.on_change: callback for entries this peer must send as NOTIFY (issue #14 point 3,
     approved by all three members). build_node sets it to Node._on_local_change.
+    Engine.lock: shared with Scanner.lock; build_node sets both to one lock (#14).
 
 Files are written only through the assembler (transfer/assembler.py, #16), which builds in
 .meshsync/tmp/ and verifies file_hash before os.replace (§7.3).
@@ -91,25 +92,24 @@ class Engine:
         # Same file Node and Scanner use (decision (l)).
         self.peer_id = peer_id if peer_id is not None else load_or_create_peer_id(self.root)
         self._assemble = assemble
-        self._lock = threading.Lock()  # around compare + index.put; never held for I/O (R-4.7)
+        # Shared with the scanner: build_node sets both to one lock (#14). Held across the
+        # version re-check, the disk check, assemble's os.replace and index.put, so the scanner
+        # never sees a file and an index entry that disagree. on_change runs outside (R-4.7).
+        self.lock: threading.RLock = threading.RLock()
 
     # ------------------------------------------------------------ node.EngineLike
 
     def on_remote_entry(self, peer: str, entry: dict) -> Action:
         """Decide what to do with a remote entry (PROTOCOL.md §9.3)."""
-        with self._lock:
+        with self.lock:
             local = self.index.get(entry["path"])
             order = vclock.compare(entry["version"], local["version"] if local else {})
-            if order == "concurrent" and local is not None:
-                if (
-                    local["file_hash"] == entry["file_hash"]
-                    and local["deleted"] == entry["deleted"]
-                ):
-                    # §9.4: same content is not a conflict; just merge the vectors.
-                    merged = dict(local, version=vclock.merge(local["version"], entry["version"]))
-                    self.index.put(merged)
-                    log.info("%s: concurrent but same content, merged vectors", entry["path"])
-                    return Action("skip", entry)
+            if order == "concurrent" and local is not None and _same_content(local, entry):
+                # §9.4: same content is not a conflict; just merge the vectors.
+                merged = dict(local, version=vclock.merge(local["version"], entry["version"]))
+                self.index.put(merged)
+                log.info("%s: concurrent but same content, merged vectors", entry["path"])
+                return Action("skip", entry)
         if order == "dominates":
             return Action("delete" if entry["deleted"] else "fetch", entry)
         if order == "concurrent":
@@ -119,23 +119,28 @@ class Engine:
 
     def on_fetched(self, entry: dict) -> None:
         """Chunks are in the store: write the file and record the entry (§7.3)."""
-        if entry["deleted"]:
-            self._apply_delete(entry)
-            return
-        local = self._still(entry, "dominates")
-        if local is False or not self._disk_matches(entry["path"], local):
-            return
-        if not self._write(entry):
-            return
-        self._put_if_unchanged(entry, local)
+        with self.lock:
+            if entry["deleted"]:
+                self._apply_delete(entry)
+                return
+            local = self._still(entry, "dominates")
+            if local is False or not self._disk_matches(entry["path"], local):
+                return
+            if self._write(entry):
+                self.index.put(entry)
 
     def apply(self, action: Action) -> None:
-        if action.kind == "delete":
-            self._apply_delete(action.entry)
-        elif action.kind == "conflict":
-            self._apply_conflict(action.entry)
-        elif action.kind == "fetch":
+        if action.kind == "fetch":
             self.on_fetched(action.entry)
+            return
+        resolved = None
+        with self.lock:
+            if action.kind == "delete":
+                self._apply_delete(action.entry)
+            elif action.kind == "conflict":
+                resolved = self._apply_conflict(action.entry)
+        if resolved is not None and self.on_change is not None:
+            self.on_change(resolved)  # outside the lock (R-4.7)
 
     # ------------------------------------------------------------ tombstones (§9.5)
 
@@ -143,58 +148,56 @@ class Engine:
         local = self._still(entry, "dominates")
         if local is False:
             return
-        path = self.root / entry["path"]
-        if self._disk_matches(entry["path"], local):
-            try:
-                path.unlink()
-                log.info("deleted %s (remote tombstone)", entry["path"])
-            except FileNotFoundError:
-                pass
-            except OSError as e:
-                log.warning("could not delete %s: %s", entry["path"], e)
+        if self._disk_matches(entry["path"], local, quiet=True):
+            if not self._unlink(entry["path"]):
                 return
+            log.info("deleted %s (remote tombstone)", entry["path"])
         else:
             # Edited since the last scan: keep it; the scanner sends it as a newer edit.
             log.info("%s changed locally; keeping it despite the remote tombstone", entry["path"])
-        self._put_if_unchanged(entry, local)
+        self.index.put(entry)
 
     # ------------------------------------------------------------ conflicts (§9.4)
 
-    def _apply_conflict(self, remote: dict) -> None:
+    def _apply_conflict(self, remote: dict) -> dict | None:
+        """Write both versions and record the merged entry; the entry to NOTIFY, or None.
+
+        One side may be a tombstone (deleted on one peer, edited on another):
+        - the tombstone keeps the name: nothing is written at the original path (the file is
+          removed) and the edited version goes to the conflict name, so nothing is lost;
+        - the edit keeps the name: a deletion has no content, so there is no copy to make; the
+          edit is written at (or stays at) the original path.
+        Remote chunks are already in the store: node.py fetches before apply (#50).
+        """
         local = self._still(remote, "concurrent")
         if local is False or local is None:
-            return
+            return None
         if not self._disk_matches(remote["path"], local):
-            return
+            return None  # unscanned local edit: the scanner sends it, the next exchange resolves
         remote_wins, winner, tag = resolve(local["version"], remote["version"])
         keeper, loser = (remote, local) if remote_wins else (local, remote)
         copy_path = conflict_name(remote["path"], tag)
-        # The losing version is saved under the conflict name first (no data lost). A
-        # tombstone has no content, so a delete that loses leaves no copy.
         if not loser["deleted"] and not self._write(loser, dest=copy_path):
-            return
+            return None
         if remote_wins:
             if keeper["deleted"]:
-                try:
-                    (self.root / remote["path"]).unlink()
-                except FileNotFoundError:
-                    pass
-                except OSError as e:
-                    log.warning("could not delete %s: %s", remote["path"], e)
-                    return
+                if not self._unlink(remote["path"]):
+                    return None
             elif not self._write(keeper):
-                return
+                return None
         version = vclock.merge(local["version"], remote["version"])
         resolver = winner == self.peer_id
         if resolver:  # issue #14 point 4: only the winning peer bumps and sends NOTIFY
             version = vclock.bump(version, self.peer_id)
         resolved = dict(keeper, version=version)
-        if self._put_if_unchanged(resolved, local):
+        self.index.put(resolved)
+        if loser["deleted"]:
+            log.info("%s: conflict with a deletion, edit kept", remote["path"])
+        else:
             log.info("%s: conflict resolved, other version saved as %s", remote["path"], copy_path)
-            if resolver and self.on_change is not None:
-                self.on_change(resolved)  # outside the lock (R-4.7)
+        return resolved if resolver else None
 
-    # ------------------------------------------------------------ helpers
+    # ------------------------------------------------------------ helpers (lock held)
 
     def _still(self, remote: dict, expected: str) -> "dict | None | bool":
         """Local entry if remote still compares as expected, else False (newer entry arrived)."""
@@ -205,12 +208,12 @@ class Engine:
             return False
         return local
 
-    def _disk_matches(self, rel: str, local: dict | None) -> bool:
+    def _disk_matches(self, rel: str, local: dict | None, *, quiet: bool = False) -> bool:
         """True if the file on disk is what the local index entry says (or absent if none)."""
         want = None if local is None or local["deleted"] else local["file_hash"]
-        have = _hash_file(self.root / rel)
-        if have != want:
-            log.info("%s changed on disk since the last scan; waiting for the scanner", rel)
+        if _hash_file(self.root / rel) != want:
+            if not quiet:
+                log.info("%s changed on disk since the last scan; waiting for the scanner", rel)
             return False
         return True
 
@@ -225,14 +228,19 @@ class Engine:
             return False
         return True
 
-    def _put_if_unchanged(self, entry: dict, before: dict | None) -> bool:
-        with self._lock:
-            now = self.index.get(entry["path"])
-            if (now["version"] if now else None) != (before["version"] if before else None):
-                log.info("%s: index changed while writing; not recording", entry["path"])
-                return False
-            self.index.put(entry)
-            return True
+    def _unlink(self, rel: str) -> bool:
+        try:
+            (self.root / rel).unlink()
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            log.warning("could not delete %s: %s", rel, e)
+            return False
+        return True
+
+
+def _same_content(a: dict, b: dict) -> bool:
+    return (a["file_hash"], a["deleted"]) == (b["file_hash"], b["deleted"])
 
 
 def _hash_file(path: Path) -> str | None:
