@@ -411,3 +411,30 @@ def test_close_does_not_wait_for_a_stuck_sender() -> None:
     conn._send_lock.release()
     with pytest.raises(ConnectionError):  # BYE was skipped: the peer just sees EOF
         recv_raw(peer)
+
+
+def test_messages_are_recorded_with_peer_and_wire_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    """#17: every sent and received message goes to metrics.record (§8.3, §11)."""
+    seen: list[tuple[str, str, str, int]] = []
+    monkeypatch.setattr(
+        connection.metrics, "record", lambda d, p, ty, sz, t: seen.append((d, p, ty, sz))
+    )
+    conn, peer = raw_pair()
+    body = encode_body(MsgType.PING, {"t": 12.5})
+    send_raw(peer, MsgType.PING, 9, {"t": 12.5})
+    recv_raw(peer)
+    conn.close(send_bye=False)
+    size = 12 + len(body)  # HEADER_SIZE + body; PONG body has the same length
+    assert ("recv", "alice", "PING", size) in seen
+    assert ("send", "alice", "PONG", size) in seen
+
+
+def test_metrics_failure_does_not_break_connection(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(*_: object) -> None:
+        raise RuntimeError("disk full")
+
+    monkeypatch.setattr(connection.metrics, "record", boom)
+    conn, peer = raw_pair()
+    send_raw(peer, MsgType.PING, 9, {"t": 1.5})
+    assert recv_raw(peer) == (MsgType.PONG, 9, {"t": 1.5})
+    conn.close(send_bye=False)
