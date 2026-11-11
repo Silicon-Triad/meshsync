@@ -168,6 +168,9 @@ class Engine:
         - the edit keeps the name: a deletion has no content, so there is no copy to make; the
           edit is written at (or stays at) the original path.
         Remote chunks are already in the store: node.py fetches before apply (#50).
+        The losing copy is written before the keeper. If the keeper write then fails, the copy
+        stays on disk and the index is unchanged; the retry rewrites it, and if the scanner
+        indexes it first, the same-hash rule merges the entries.
         """
         local = self._still(remote, "concurrent")
         if local is False or local is None:
