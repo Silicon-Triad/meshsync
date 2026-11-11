@@ -104,8 +104,13 @@ class FakeScheduler:
         self.store = store
         self.delay = delay
         self._sleep = sleep
+        self.calls: list[dict] = []  # every entry fetch() was called with
+        self.fail_paths: set[str] = set()  # fetch() raises ConnectionError for these paths
 
     def fetch(self, entry: dict, peers: list[PeerInfo]) -> None:
+        self.calls.append(entry)
+        if entry["path"] in self.fail_paths:
+            raise ConnectionError(f"fake fetch failure for {entry['path']}")
         if self.delay and self._sleep:
             self._sleep(self.delay)
         for h in entry["chunks"]:

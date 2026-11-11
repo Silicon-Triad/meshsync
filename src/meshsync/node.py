@@ -247,7 +247,10 @@ class Node:
         try:
             if action.kind == "fetch":
                 self._pool.submit(self._fetch, action.entry)
-            elif action.kind in ("conflict", "delete"):
+            elif action.kind == "conflict":
+                # §7.2, PROTOCOL.md §9.4: the conflict copy needs the remote chunks first
+                self._pool.submit(self._fetch_then_apply, action)
+            elif action.kind == "delete":  # a tombstone has no chunks (§9.5)
                 self._pool.submit(self._apply, action)
             # "skip": nothing to do
         except RuntimeError:  # pool shut down by stop() while this reader thread was running
@@ -259,6 +262,14 @@ class Node:
             self.engine.on_fetched(entry)
         except Exception:  # noqa: BLE001 - logged; a failed fetch must not kill the worker
             log.exception("fetch of %s failed", entry.get("path"))
+
+    def _fetch_then_apply(self, action: Action) -> None:
+        try:
+            self.scheduler.fetch(action.entry, self.manager.peers())
+        except Exception:  # noqa: BLE001 - logged; the next NOTIFY or INDEX exchange retries
+            log.exception("fetch for %s of %s failed", action.kind, action.entry.get("path"))
+            return
+        self._apply(action)
 
     def _apply(self, action: Action) -> None:
         try:

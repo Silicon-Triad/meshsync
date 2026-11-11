@@ -74,10 +74,11 @@ class Side:
             KEY, me, tcp_port=self.port, udp_port=0, static_peers=static,
             discovery_factory=NoDiscovery, index_rev=lambda: self.index.rev,
         )  # fmt: skip
+        self.scheduler = FakeScheduler(self.store, delay, time.sleep)
         self.node = Node(
             None,  # type: ignore[arg-type]  # config is only used when no manager is given
             index=self.index, store=self.store, engine=self.engine,
-            scheduler=FakeScheduler(self.store, delay, time.sleep),
+            scheduler=self.scheduler,
             scanner=self.scanner, manager=mgr,
         )  # fmt: skip
         self.mgr = mgr
@@ -151,12 +152,46 @@ def test_chunk_req_missing_hash_is_nonfatal(sides: list[Side]) -> None:
     assert conn.request(MsgType.INDEX_REQ, {}).result(WAIT)[0] == MsgType.INDEX
 
 
-def test_conflict_calls_apply(sides: list[Side]) -> None:
+def test_conflict_fetches_chunks_then_applies(sides: list[Side]) -> None:
+    # #49, §7.2, PROTOCOL.md §9.4: remote chunks must be in the store before apply("conflict")
     a, b = pair(sides, force="conflict")
+    seen_at_apply: list[tuple[int, bool]] = []
+    real_apply = b.engine.apply
+
+    def apply(action: object) -> None:
+        seen_at_apply.append((len(b.scheduler.calls), b.store.has(sha(b"x"))))
+        real_apply(action)  # type: ignore[arg-type]
+
+    b.engine.apply = apply  # type: ignore[method-assign]
     entry = a.add_file("c.txt", [b"x"], {ALICE.peer_id: 1})
     assert wait_until(lambda: [x.kind for x in b.engine.applied] == ["conflict"])
     assert b.engine.applied[0].entry == entry
+    assert b.scheduler.calls == [entry]
+    assert seen_at_apply == [(1, True)]
     assert b.engine.fetched == []
+
+
+def test_failed_conflict_fetch_skips_apply_and_worker_survives(sides: list[Side]) -> None:
+    a, b = pair(sides, force="conflict")
+    b.scheduler.fail_paths.add("bad.txt")
+    bad = a.add_file("bad.txt", [b"x"], {ALICE.peer_id: 1})
+    a.scanner.trigger(bad)
+    assert wait_until(lambda: bad in b.scheduler.calls)
+    time.sleep(0.2)
+    assert b.engine.applied == []
+    b.engine.force = None  # next entry is a plain "fetch"
+    good = a.add_file("good.txt", [b"y"], {ALICE.peer_id: 1})
+    a.scanner.trigger(good)
+    assert wait_until(lambda: b.index.get("good.txt") == good)
+    assert b.engine.applied == []
+
+
+def test_delete_applies_without_scheduler(sides: list[Side]) -> None:
+    a, b = pair(sides, force="delete")
+    a.add_file("d.txt", [b"x"], {ALICE.peer_id: 1})
+    assert wait_until(lambda: [x.kind for x in b.engine.applied] == ["delete"])
+    time.sleep(0.2)
+    assert b.scheduler.calls == []
 
 
 def test_skip_does_nothing(sides: list[Side]) -> None:
