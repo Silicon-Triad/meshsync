@@ -24,3 +24,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-11 | Muhammad Ahmed Qazi | Claude Code (Opus 5.5) | conflict fetch before apply (#49): node.py, tests/fakes.py, tests/unit/test_node.py | |
 | 2026-11-10 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | polling scanner (#12): sync/scanner.py, tests/unit/test_scanner.py | |
 | 2026-11-11 | Huzaifa Hanif | Claude Code (Opus 5.5) | file assembler (#16): transfer/assembler.py, tests/unit/test_assembler.py | |
+| 2026-11-11 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | persisted scan cache (#51): sync/scanner.py, tests/unit/test_scanner.py | |

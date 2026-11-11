@@ -239,3 +239,86 @@ def test_peer_id_from_meta_dir(tmp_path: Path) -> None:
     cfg = Config(sync_dir=tmp_path, name="me", secret_file=tmp_path / "secret")
     scanner = Scanner(cfg, Index(tmp_path))
     assert scanner.peer_id == load_or_create_peer_id(tmp_path)
+
+
+# ---------------------------------------------------------------- persisted size/mtime cache (#51)
+
+
+def count_reads(monkeypatch: pytest.MonkeyPatch) -> list[Path]:
+    """Record every file the scanner chunks."""
+    import meshsync.sync.scanner as scanner_mod
+
+    reads: list[Path] = []
+    real = scanner_mod.chunk_file
+
+    def spy(path, mode):  # type: ignore[no-untyped-def]
+        reads.append(Path(path))
+        return real(path, mode)
+
+    monkeypatch.setattr(scanner_mod, "chunk_file", spy)
+    return reads
+
+
+def test_restart_does_not_reread_unchanged_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "a.txt").write_bytes(b"hello")
+    (tmp_path / "b.txt").write_bytes(b"world")
+    scanner, _ = make(tmp_path)
+    assert len(scanner.scan_once()) == 2
+    reads = count_reads(monkeypatch)
+    restarted, _ = make(tmp_path)
+    assert restarted.scan_once() == []
+    assert reads == []
+
+
+def test_edit_while_stopped_is_detected(tmp_path: Path) -> None:
+    path = tmp_path / "a.txt"
+    path.write_bytes(b"hello")
+    scanner, _ = make(tmp_path)
+    scanner.scan_once()
+    path.write_bytes(b"jello")
+    touch_later(path)
+    restarted, index = make(tmp_path)
+    [entry] = restarted.scan_once()
+    assert entry["file_hash"] == sha(b"jello")
+    assert entry["version"] == {ME: 2}
+    assert index.get("a.txt") == entry
+
+
+def test_delete_while_stopped_becomes_tombstone(tmp_path: Path) -> None:
+    (tmp_path / "a.txt").write_bytes(b"hello")
+    scanner, _ = make(tmp_path)
+    scanner.scan_once()
+    (tmp_path / "a.txt").unlink()
+    restarted, _ = make(tmp_path)
+    [entry] = restarted.scan_once()
+    assert entry["deleted"] is True
+    assert entry["file_hash"] == EMPTY_FILE_HASH
+
+
+def test_corrupt_cache_rescans(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / "a.txt").write_bytes(b"hello")
+    scanner, _ = make(tmp_path)
+    scanner.scan_once()
+    (tmp_path / ".meshsync" / "scan_cache.json").write_text("{not json", encoding="utf-8")
+    reads = count_reads(monkeypatch)
+    restarted, _ = make(tmp_path)
+    assert restarted.scan_once() == []  # same content as the index: not an edit
+    assert reads == [tmp_path / "a.txt"]
+
+
+def test_cache_disagreeing_with_index_rereads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "a.txt").write_bytes(b"hello")
+    scanner, index = make(tmp_path)
+    scanner.scan_once()
+    other = index.get("a.txt")
+    assert other is not None
+    other.update(file_hash=sha(b"other"), version={ME: 1, OTHER: 1})
+    index.put(other)  # e.g. the engine stored a remote entry before the restart
+    reads = count_reads(monkeypatch)
+    restarted, _ = make(tmp_path)
+    restarted.scan_once()
+    assert reads == [tmp_path / "a.txt"]

@@ -9,7 +9,10 @@ Each poll walks the sync root and compares every regular file with its index ent
 - new file, or content (file_hash) differs from the entry -> new entry, own counter bumped;
 - entry exists (not a tombstone) but the file is gone -> tombstone (§7.3, PROTOCOL.md §9.5).
 Renames are seen as a delete plus a create (D14). Files whose size and mtime did not change since
-the last poll are not re-read. Content equal to the index entry (for example a file the engine
+the last poll are not re-read. That size/mtime cache is saved to META_DIR/scan_cache.json, so a
+restart does not rechunk unchanged files either (#51); on load, a cached file is kept only if its
+index entry still has the cached file_hash, so the chunk list reused is the index's own (§7.1).
+Content equal to the index entry (for example a file the engine
 just assembled) is not a change, so remote writes are not echoed back as local edits.
 
 A changed file's chunks are put in the chunk store, so peers can fetch them with CHUNK_REQ, then
@@ -17,8 +20,10 @@ the entry is stored in the index and passed to on_change (node.ScannerLike).
 """
 
 import hashlib
+import json
 import logging
 import os
+import tempfile
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -31,6 +36,8 @@ from meshsync.sync.index import Index
 from meshsync.sync.store import ChunkStore
 
 log = logging.getLogger(__name__)
+
+_CACHE_FILE = "scan_cache.json"  # local only, never sent to peers (#51)
 
 
 class _FileChanged(Exception):
@@ -57,7 +64,9 @@ class Scanner:
             peer_id = load_or_create_peer_id(self.root)
         self.peer_id = peer_id
         self.store = ChunkStore(self.root)
-        self._seen: dict[str, tuple[int, int]] = {}  # path -> (size, mtime_ns) last scanned
+        self._cache_path = self.root / META_DIR / _CACHE_FILE
+        # path -> (size, mtime_ns, file_hash) when last scanned; persisted across restarts (#51)
+        self._seen: dict[str, tuple[int, int, str]] = self._load_cache()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._on_change: Callable[[dict], None] | None = None
@@ -102,20 +111,25 @@ class Scanner:
         """Scan the root once; store and return the entries that changed (no callback)."""
         changed: list[dict] = []
         present: set[str] = set()
+        before = dict(self._seen)
         for rel, st in self._walk():
             present.add(rel)
             key = (st.st_size, st.st_mtime_ns)
-            if self._seen.get(rel) == key:
+            cached = self._seen.get(rel)
+            if cached is not None and cached[:2] == key:
                 continue
-            entry = self._scan_file(rel)
-            if entry is None:
+            result = self._scan_file(rel)
+            if result is None:
                 continue
-            self._seen[rel] = key
+            entry, file_hash = result
+            self._seen[rel] = (*key, file_hash)
             if entry is not _UNCHANGED:
                 changed.append(entry)
         for path in list(self._seen):
             if path not in present:
                 del self._seen[path]
+        if self._seen != before:
+            self._save_cache()
         for old in self.index.entries():
             if not old["deleted"] and old["path"] not in present:
                 entry = self._make_entry(old["path"], 0, EMPTY_FILE_HASH, [], deleted=True)
@@ -141,8 +155,8 @@ class Scanner:
                     found.append(((rel_dir / name).as_posix(), st))
         return found
 
-    def _scan_file(self, rel: str) -> "dict | object | None":
-        """New entry if the file changed, _UNCHANGED if not, None to retry next poll."""
+    def _scan_file(self, rel: str) -> "tuple[dict | object, str] | None":
+        """(new entry, or _UNCHANGED, and the file_hash read), or None to retry next poll."""
         try:
             size, file_hash, chunks = self._read(rel)
         except (OSError, _FileChanged) as e:
@@ -150,10 +164,10 @@ class Scanner:
             return None
         old = self.index.get(rel)
         if old is not None and not old["deleted"] and old["file_hash"] == file_hash:
-            return _UNCHANGED
+            return _UNCHANGED, file_hash
         entry = self._make_entry(rel, size, file_hash, chunks, deleted=False)
         # A rejected path is remembered as seen, so it is not re-read and logged every poll.
-        return entry if self._put(entry) else _UNCHANGED
+        return (entry if self._put(entry) else _UNCHANGED), file_hash
 
     def _read(self, rel: str) -> tuple[int, str, list[str]]:
         """Chunk the file, put its chunks in the store and return (size, file_hash, chunks)."""
@@ -196,6 +210,62 @@ class Scanner:
             log.warning("not syncing %s: %s", entry["path"], e)
             return False
         return True
+
+    # ------------------------------------------------------------ size/mtime cache (#51)
+
+    def _load_cache(self) -> dict[str, tuple[int, int, str]]:
+        """Cached (size, mtime_ns, file_hash) per path; empty (full rescan) if missing or bad."""
+        try:
+            raw = self._cache_path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return {}
+        except OSError as e:
+            log.warning("cannot read scan cache %s, rescanning all files: %s", self._cache_path, e)
+            return {}
+        try:
+            data = json.loads(raw)
+            if not isinstance(data, dict) or not isinstance(data.get("files"), dict):
+                raise ValueError("expected an object with a 'files' object")
+            seen: dict[str, tuple[int, int, str]] = {}
+            for path, item in data["files"].items():
+                if not (
+                    isinstance(item, list)
+                    and len(item) == 3
+                    and all(type(x) is int for x in item[:2])
+                    and isinstance(item[2], str)
+                ):
+                    raise ValueError(f"bad cache item for {path!r}")
+                seen[path] = (item[0], item[1], item[2])
+        except ValueError as e:  # json.JSONDecodeError is a ValueError
+            log.warning("scan cache %s is invalid, rescanning all files: %s", self._cache_path, e)
+            return {}
+        # Keep a cached file only if the index still describes the same content (§7.1); otherwise
+        # it is re-read, so the cache never hides a file the index does not match.
+        kept: dict[str, tuple[int, int, str]] = {}
+        for path, item in seen.items():
+            entry = self.index.get(path)
+            if entry is not None and not entry["deleted"] and entry["file_hash"] == item[2]:
+                kept[path] = item
+        return kept
+
+    def _save_cache(self) -> None:
+        """Write the cache atomically (temp file + os.replace, as the index does, D8)."""
+        payload = json.dumps({"files": {p: list(v) for p, v in self._seen.items()}}, sort_keys=True)
+        try:
+            self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(dir=self._cache_path.parent, prefix=".tmp-scan-cache-")
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    f.write(payload)
+                os.replace(tmp, self._cache_path)
+            except BaseException:
+                try:
+                    os.unlink(tmp)
+                except FileNotFoundError:
+                    pass
+                raise
+        except OSError as e:  # the cache is an optimisation; losing it only costs a rescan
+            log.warning("cannot save scan cache %s: %s", self._cache_path, e)
 
 
 _UNCHANGED = object()
