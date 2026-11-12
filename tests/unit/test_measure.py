@@ -111,3 +111,31 @@ def test_cli_rejects_missing_testdata(tmp_path: Path) -> None:
     with pytest.raises(SystemExit):
         mr.main(["full_delta", "--testdata", str(tmp_path), "--data", str(tmp_path)])
     assert not (tmp_path / "full_delta").exists()  # nothing was run
+
+
+def test_suspect_flags_duplicate_downloads() -> None:
+    # #59 review / #60: a run that downloaded chunks twice must not look valid
+    size = 100 * 1024 * 1024
+    assert mr.suspect(104_874_436, size) == ""  # one copy plus 12-byte headers
+    assert mr.suspect(209_285_561, size) == "dup"  # the #60 double download
+
+
+def test_clear_runs_removes_stale_results(tmp_path: Path) -> None:
+    for k in (1, 2, 3):
+        (tmp_path / f"run{k}.csv").write_text("x")
+    (tmp_path / "notes.txt").write_text("keep")
+    mr.clear_runs(tmp_path)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["notes.txt"]
+    mr.clear_runs(tmp_path / "missing")  # no folder yet: nothing to do
+
+
+def test_place_removes_stage_when_copy_fails(tmp_path: Path) -> None:
+    sync = tmp_path / "sync"
+    with pytest.raises(FileNotFoundError):
+        mr.place(tmp_path / "does-not-exist", sync, "large.bin")
+    assert list((sync / META_DIR).iterdir()) == []
+    assert not (sync / "large.bin").exists()
+
+
+def test_new_columns_are_in_fields() -> None:
+    assert {"e2e_from", "poll_s", "suspect"} <= set(mr.FIELDS)

@@ -4,7 +4,11 @@
 Usage: scripts/measure/run.py EXPERIMENT [--runs 5] [--testdata testdata] [--data data]
        EXPERIMENT: full_delta | fixed_cdc | sources | all
 
-Experiments (this PR: §11 conditions 1-3, plain mode, every peer on this machine):
+SINGLE HOST ONLY: every peer runs on this machine (127.0.0.1). The runner for the 3 laptops is
+issue #77; until then these numbers are pilots, and all peers share this machine's CPUs and disk
+(scanning, assembly and transfer compete), so laptop runs supersede them.
+
+Experiments (§11 conditions 1-3, plain mode):
   full_delta  condition 1: sync set A's 100 MiB file (full), then its 1 KiB overwrite (delta)
   fixed_cdc   condition 2: A, then the 1 KiB insert at offset 0, with --chunking fixed vs cdc
   sources     condition 3: a fresh peer joins and fetches A from one holder vs two holders
@@ -13,12 +17,18 @@ Each run starts a fresh mesh (new folders, empty chunk stores) under data/raw/ (
 runs every peer through scripts/measure/peer.py so it writes its metrics CSV (#17), and writes
 one summary row per receiving peer to data/<experiment>/run<k>.csv.
 
-Every number comes from the receiving host's own clock and CSV (no clock sync across hosts):
-  e2e_s       file placed on the source -> file complete on the receiver (includes the source's
-              scan poll, D13, and chunking)
+Columns (one host, one clock; bytes are application layer, header + body, see #56):
+  e2e_from    what e2e_s starts at: "placed" (file put on the source) or, for condition 3,
+              "joiner_start" (joiner process started: interpreter start, handshake and INDEX
+              exchange included). Never compare e2e_s across different e2e_from values.
+  e2e_s       e2e_from -> file complete on the receiver; resolution is --poll (poll_s column)
   notify_s    file placed -> source sends its first NOTIFY (the scan + chunking part of e2e_s)
   transfer_s  receiver's first CHUNK_REQ sent -> last CHUNK_DATA received
-  chunk_bytes CHUNK_DATA bytes received (header + body, application layer, see #56)
+  chunk_bytes CHUNK_DATA bytes received; sources/source_bytes say which peers sent them (with
+              3 peers, receivers also fetch from each other, so this is not source -> receiver only;
+              use --peers 2 for a point-to-point number)
+  suspect     "dup" if chunk_bytes > 1.1 x file size: chunks were downloaded more than once
+              (#60). Such rows must not be used; condition 3 retries the run instead.
 Test data comes from scripts/gen_testdata.py (data set decided in #25): sets A and D.
 Owner: Huzaifa Hanif (CS-24039).
 """
@@ -67,7 +77,11 @@ FIELDS = (
     "sent_bytes",
     "sources",
     "source_bytes",
+    "e2e_from",
+    "poll_s",
+    "suspect",
 )
+DUP_FACTOR = 1.1  # harness check: more chunk bytes than this x file size = duplicate downloads
 _SYNCED_RE = re.compile(r"connection to (\S+) is SYNCED")
 
 
@@ -150,10 +164,14 @@ def place(src: Path, sync_dir: Path, rel: str) -> float:
     """
     stage = sync_dir / META_DIR / f"measure-stage-{secrets.token_hex(4)}"
     stage.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, stage)
-    dest = sync_dir / rel
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    os.replace(stage, dest)
+    try:
+        shutil.copyfile(src, stage)
+        dest = sync_dir / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(stage, dest)
+    except BaseException:
+        stage.unlink(missing_ok=True)
+        raise
     return time.time()
 
 
@@ -334,9 +352,13 @@ class Step:
     file: str  # test data path relative to --testdata
 
 
+def suspect(chunk_bytes: int, size: int) -> str:
+    return "dup" if chunk_bytes > DUP_FACTOR * size else ""
+
+
 def measure(
     step: Step, mesh: LocalMesh, source: Peer, receivers: list[Peer], t0: float,
-    done: dict[str, float], size: int,
+    done: dict[str, float], size: int, poll: float, e2e_from: str = "placed",
 ) -> list[dict[str, str]]:  # fmt: skip
     # No wait needed: peer.py's FileHandler flushes every row, and a receiver's CHUNK_DATA rows
     # are written before its file is assembled, so they are on disk once `done` was seen.
@@ -361,6 +383,9 @@ def measure(
                 "sent_bytes": str(w.sent_bytes),
                 "sources": str(len(w.source_bytes)),
                 "source_bytes": ";".join(f"{k}:{v}" for k, v in sorted(w.source_bytes.items())),
+                "e2e_from": e2e_from,
+                "poll_s": fmt(poll),
+                "suspect": suspect(w.chunk_bytes, size),
             }
         )
     return rows
@@ -377,8 +402,12 @@ def push(
     t0 = place(src, source.data, TARGET)
     done = wait_files(receivers, size, before, args, mesh)
     verify(receivers, manifest[step.file])
-    rows = measure(step, mesh, source, receivers, t0, done, size)
+    rows = measure(step, mesh, source, receivers, t0, done, size, args.poll)
     for r in rows:
+        if r["suspect"]:
+            log.warning("%s/%s run %s %s: %s chunk bytes for a %s-byte file (duplicates, #60)",
+                        r["experiment"], r["variant"], r["run"], r["receiver"], r["chunk_bytes"],
+                        r["size"])  # fmt: skip
         log.info(
             "%s/%s run %s %s: e2e %ss transfer %ss %s chunk bytes from %s",
             r["experiment"], r["variant"], r["run"], r["receiver"], r["e2e_s"][:6],
@@ -436,9 +465,11 @@ def exp_sources(run: int, args: argparse.Namespace, manifest: dict[str, str]) ->
     """§11 condition 3: a fresh peer fetches A from one holder vs from two holders.
 
     The holders get A before they start, so it is in their index and chunk store. The joiner
-    starts last; e2e_s here runs from the joiner's start (discovery and handshake included), and
-    transfer_s is the chunk transfer alone. A 2-source run where the joiner happened to fetch
-    from one peer only (the second link came up after the fetch began) is retried, see --retries.
+    starts last; e2e_s here runs from the joiner's start (e2e_from = "joiner_start": interpreter
+    start, handshake and INDEX exchange included), and transfer_s is the chunk transfer alone.
+    An attempt is retried (see --retries) when the joiner fetched from fewer peers than there are
+    holders (the second link came up after the fetch began), or when it downloaded chunks more
+    than once (suspect = "dup", the #60 bug): only clean runs are written.
     """
     rows: list[dict] = []
     for holders in (1, 2):
@@ -457,16 +488,16 @@ def exp_sources(run: int, args: argparse.Namespace, manifest: dict[str, str]) ->
                 mesh.start([joiner])
                 done = wait_files([joiner], size, {joiner.name: None}, args, mesh)
                 verify([joiner], manifest[A])
-                got = measure(
-                    Step("sources", variant, run, A), mesh, hs[0], [joiner], t0, done, size
-                )
-            if int(got[0]["sources"]) == holders:
+                got = measure(Step("sources", variant, run, A), mesh, hs[0], [joiner], t0,
+                              done, size, args.poll, "joiner_start")  # fmt: skip
+            if int(got[0]["sources"]) == holders and not got[0]["suspect"]:
                 rows += got
                 break
-            log.warning("%s run %d attempt %d used %s source(s); retrying", variant, run,
-                        attempt, got[0]["sources"])  # fmt: skip
+            log.warning("%s run %d attempt %d: %s source(s), %s chunk bytes%s; retrying",
+                        variant, run, attempt, got[0]["sources"], got[0]["chunk_bytes"],
+                        " (duplicates, #60)" if got[0]["suspect"] else "")  # fmt: skip
         else:
-            raise RuntimeError(f"{variant} run {run}: never fetched from {holders} sources")
+            raise RuntimeError(f"{variant} run {run}: no clean {holders}-source attempt")
     return rows
 
 
@@ -475,6 +506,13 @@ EXPERIMENTS: dict[str, Callable[[int, argparse.Namespace, dict[str, str]], list[
     "fixed_cdc": exp_fixed_cdc,
     "sources": exp_sources,
 }
+
+
+def clear_runs(folder: Path) -> None:
+    """Remove old run<k>.csv files, so a batch with fewer --runs leaves no stale results."""
+    for old in sorted(folder.glob("run*.csv")):
+        log.info("removing old %s", old)
+        old.unlink()
 
 
 def write_rows(path: Path, rows: list[dict]) -> None:
@@ -515,12 +553,22 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     names = list(EXPERIMENTS) if args.experiment == "all" else [args.experiment]
+    failed: list[str] = []
     for name in names:
+        clear_runs(args.data / name)
         for run in range(1, args.runs + 1):
-            rows = EXPERIMENTS[name](run, args, manifest)
+            try:
+                rows = EXPERIMENTS[name](run, args, manifest)
+            except Exception:  # noqa: BLE001 - one bad run must not lose the rest of the batch
+                log.exception("%s run %d failed; continuing", name, run)
+                failed.append(f"{name} run {run}")
+                continue
             out = args.data / name / f"run{run}.csv"
             write_rows(out, rows)
             log.info("wrote %s", out)
+    if failed:
+        log.error("%d run(s) failed: %s", len(failed), ", ".join(failed))
+        return 1
     return 0
 
 
