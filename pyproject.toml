@@ -28,4 +28,7 @@ select = ["E", "F", "W", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["slow: takes more than 1 s (real sockets/threads)"]
+markers = [
+    "slow: takes more than 1 s (real sockets/threads)",
+    "integration: multi-peer meshsync processes on 127.0.0.1 (tests/integration, #62)",
+]
