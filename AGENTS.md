@@ -66,6 +66,7 @@ bash -n scripts/*.sh             # shell syntax check
 scripts/gen_certs.sh certs ahmed mujtaba huzaifa   # TLS certs (never commit)
 scripts/gen_testdata.py testdata --sets A,D      # measurement data, #25 (never commit)
 scripts/measure/run.py full_delta --runs 5        # §11 runs -> data/<experiment>/ (#20)
+analysis/analyze.py              # data/ -> tables + graphs in analysis/out/ (#71)
 ```
 
 Not yet available: `scripts/run_local_mesh.sh` (added by #7), condition 4 in
