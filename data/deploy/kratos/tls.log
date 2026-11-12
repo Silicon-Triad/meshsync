@@ -1,0 +1,12 @@
+2026-11-13 01:33:11,192 INFO meshsync.__main__: config: Config(sync_dir=PosixPath('/home/kratos/MeshSync'), name='kratos', secret_file=PosixPath('/home/kratos/.meshsync/key'), tls=True, cert_dir=PosixPath('/home/kratos/.meshsync/certs'), tcp_port=47001, udp_port=47000, chunking='cdc', peers=(), log_level='INFO')
+2026-11-13 01:33:11,203 INFO meshsync.net.manager: peer manager started: kratos on tcp 47001 (tls)
+2026-11-13 01:33:15,736 INFO meshsync.net.auth: initiator handshake ok with minipc (9ED3EE39)
+2026-11-13 01:33:15,737 INFO meshsync.net.manager: peer up: minipc 192.168.100.190:47001 (tls)
+2026-11-13 01:33:15,751 INFO meshsync.net.connection: connection to minipc is SYNCED
+2026-11-13 01:33:22,452 INFO meshsync.net.auth: initiator handshake ok with defalt (BDB9C75B)
+2026-11-13 01:33:22,453 INFO meshsync.net.manager: peer up: defalt 192.168.100.80:47001 (tls)
+2026-11-13 01:33:22,463 INFO meshsync.net.connection: connection to defalt is SYNCED
+2026-11-13 01:33:48,769 INFO meshsync.transfer.scheduler: fetching from-defalt-tls.txt: 1 of 1 chunks from 2 peers
+2026-11-13 01:33:48,780 INFO meshsync.transfer.scheduler: peer 9ED3EE39 has no chunk 9588237926c178b9ef79298036d991d72739714d70d5fe13ed3d43a7ba2c8724 (CHUNK_NOT_FOUND); asking another peer
+2026-11-13 01:33:48,793 INFO meshsync.transfer.scheduler: fetched all chunks of from-defalt-tls.txt
+2026-11-13 01:33:48,800 INFO meshsync.transfer.assembler: assembled from-defalt-tls.txt (53 bytes, 1 chunks)

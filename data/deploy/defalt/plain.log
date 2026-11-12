@@ -1,0 +1,27 @@
+2026-11-12 20:27:29,173 INFO meshsync.__main__: config: Config(sync_dir=PosixPath('/home/defalt/MeshSync'), name='defalt', secret_file=PosixPath('/home/defalt/.meshsync/key'), tls=False, cert_dir=None, tcp_port=47001, udp_port=47000, chunking='cdc', peers=(), log_level='INFO')
+2026-11-12 20:27:29,194 INFO meshsync.net.manager: peer manager started: defalt on tcp 47001 (plain)
+2026-11-12 20:27:29,298 INFO meshsync.net.auth: responder handshake ok with minipc (9ED3EE39)
+2026-11-12 20:27:29,298 INFO meshsync.net.manager: peer up: minipc 192.168.100.190:0 (plain)
+2026-11-12 20:27:29,318 INFO meshsync.transfer.assembler: assembled ts.py (0 bytes, 0 chunks)
+2026-11-12 20:27:29,323 INFO meshsync.transfer.scheduler: fetching hello.txt: 1 of 1 chunks from 1 peers
+2026-11-12 20:27:29,324 INFO meshsync.transfer.scheduler: fetching plain.pcap: 1 of 1 chunks from 1 peers
+2026-11-12 20:27:29,325 INFO meshsync.transfer.scheduler: fetching new.txt: 1 of 1 chunks from 1 peers
+2026-11-12 20:27:29,325 INFO meshsync.net.connection: connection to minipc is SYNCED
+2026-11-12 20:27:29,362 INFO meshsync.transfer.scheduler: fetched all chunks of hello.txt
+2026-11-12 20:27:29,366 INFO meshsync.transfer.assembler: assembled hello.txt (39 bytes, 1 chunks)
+2026-11-12 20:27:29,410 INFO meshsync.net.auth: responder handshake ok with kratos (76F6CF68)
+2026-11-12 20:27:29,411 INFO meshsync.net.manager: peer up: kratos 192.168.100.92:0 (plain)
+2026-11-12 20:27:29,412 INFO meshsync.transfer.scheduler: fetched all chunks of new.txt
+2026-11-12 20:27:29,413 INFO meshsync.transfer.scheduler: fetched all chunks of plain.pcap
+2026-11-12 20:27:29,416 INFO meshsync.transfer.assembler: assembled new.txt (16 bytes, 1 chunks)
+2026-11-12 20:27:29,423 INFO meshsync.transfer.assembler: assembled plain.pcap (24 bytes, 1 chunks)
+2026-11-12 20:27:29,427 INFO meshsync.net.connection: connection to kratos is SYNCED
+2026-11-12 20:29:35,346 INFO meshsync.transfer.scheduler: fetching from-minipc.txt: 1 of 1 chunks from 2 peers
+2026-11-12 20:29:35,355 INFO meshsync.transfer.scheduler: peer 76F6CF68 has no chunk 0526a17ca14cd9e7dd996ad1c04d28e68f17471d9ed745e2f281fc4e7a487c19 (CHUNK_NOT_FOUND); asking another peer
+2026-11-12 20:29:35,368 INFO meshsync.transfer.scheduler: fetched all chunks of from-minipc.txt
+2026-11-12 20:29:35,376 INFO meshsync.transfer.assembler: assembled from-minipc.txt (47 bytes, 1 chunks)
+2026-11-12 20:31:35,229 INFO meshsync.sync.engine: deleted from-minipc.txt (remote tombstone)
+2026-11-12 20:32:45,551 INFO meshsync.net.connection: closing connection to kratos: peer sent BYE: shutdown
+2026-11-12 20:32:45,551 INFO meshsync.net.manager: peer down: kratos 192.168.100.92 (plain): peer sent BYE: shutdown
+2026-11-12 20:32:49,084 INFO meshsync.net.connection: closing connection to minipc: peer sent BYE: shutdown
+2026-11-12 20:32:49,084 INFO meshsync.net.manager: peer down: minipc 192.168.100.190 (plain): peer sent BYE: shutdown

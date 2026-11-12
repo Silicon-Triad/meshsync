@@ -1,0 +1,152 @@
+## hostname
+Debian
+## os
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+VERSION_ID="13"
+Linux 6.12.113+deb13-amd64 x86_64
+## python (venv)
+Python 3.13.5
+## ip -4 addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+3: wlp2s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    altname wlx0cdd24839a3c
+    inet 192.168.100.190/24 brd 192.168.100.255 scope global noprefixroute wlp2s0
+       valid_lft forever preferred_lft forever
+4: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 qdisc noqueue state UNKNOWN group default qlen 1000
+    inet 10.200.200.1/24 scope global wg0
+       valid_lft forever preferred_lft forever
+5: virbr1: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default qlen 1000
+    inet 10.10.10.1/24 brd 10.10.10.255 scope global virbr1
+       valid_lft forever preferred_lft forever
+## ip route
+default via 192.168.100.1 dev wlp2s0 proto static metric 600 
+10.10.10.0/24 dev virbr1 proto kernel scope link src 10.10.10.1 linkdown 
+10.200.200.0/24 dev wg0 proto kernel scope link src 10.200.200.1 
+192.168.100.0/24 dev wlp2s0 proto kernel scope link src 192.168.100.190 metric 600 
+## listening on meshsync ports (UDP 47000, TCP 47001)
+State  Recv-Q Send-Q Local Address:Port  Peer Address:Port
+UNCONN 0      0            0.0.0.0:47000      0.0.0.0:*   
+State  Recv-Q Send-Q Local Address:Port  Peer Address:Port
+LISTEN 0      128          0.0.0.0:47001      0.0.0.0:*   
+## firewall
+table ip filter {
+	chain INPUT {
+		type filter hook input priority filter; policy accept;
+		counter packets 4646 bytes 1854183 jump LIBVIRT_INP
+		udp dport 51820 counter packets 232 bytes 17980 accept
+	}
+
+	chain FORWARD {
+		type filter hook forward priority filter; policy accept;
+		counter packets 0 bytes 0 jump LIBVIRT_FWX
+		counter packets 0 bytes 0 jump LIBVIRT_FWI
+		counter packets 0 bytes 0 jump LIBVIRT_FWO
+		ip saddr 10.10.10.0/24 iifname "virbr1" oifname "wg0" ct state related,established counter packets 0 bytes 0 accept
+		ip daddr 10.10.10.0/24 iifname "wg0" oifname "virbr1" counter packets 0 bytes 0 accept
+	}
+
+	chain LIBVIRT_INP {
+		iifname "virbr1" udp dport 53 counter packets 0 bytes 0 accept
+		iifname "virbr1" tcp dport 53 counter packets 0 bytes 0 accept
+		iifname "virbr1" udp dport 67 counter packets 0 bytes 0 accept
+		iifname "virbr1" tcp dport 67 counter packets 0 bytes 0 accept
+	}
+
+	chain LIBVIRT_OUT {
+		oifname "virbr1" udp dport 53 counter packets 0 bytes 0 accept
+		oifname "virbr1" tcp dport 53 counter packets 0 bytes 0 accept
+		oifname "virbr1" udp dport 68 counter packets 0 bytes 0 accept
+		oifname "virbr1" tcp dport 68 counter packets 0 bytes 0 accept
+	}
+
+	chain OUTPUT {
+		type filter hook output priority filter; policy accept;
+		counter packets 3858 bytes 421073 jump LIBVIRT_OUT
+	}
+
+	chain LIBVIRT_FWO {
+		ip saddr 10.10.10.0/24 iifname "virbr1" oifname "wg0" counter packets 0 bytes 0 accept
+		iifname "virbr1" counter packets 0 bytes 0 reject
+	}
+
+	chain LIBVIRT_FWI {
+		ip daddr 10.10.10.0/24 iifname "wg0" oifname "virbr1" counter packets 0 bytes 0 accept
+		oifname "virbr1" counter packets 0 bytes 0 reject
+	}
+
+	chain LIBVIRT_FWX {
+		iifname "virbr1" oifname "virbr1" counter packets 0 bytes 0 accept
+	}
+}
+table ip nat {
+	chain LIBVIRT_PRT {
+	}
+
+	chain POSTROUTING {
+		type nat hook postrouting priority srcnat; policy accept;
+		counter packets 63 bytes 5064 jump LIBVIRT_PRT
+	}
+}
+table ip mangle {
+	chain LIBVIRT_PRT {
+		oifname "virbr1" udp dport 68 counter packets 0 bytes 0 xt target "CHECKSUM"
+	}
+
+	chain POSTROUTING {
+		type filter hook postrouting priority mangle; policy accept;
+		counter packets 3998 bytes 448233 jump LIBVIRT_PRT
+	}
+}
+table ip6 filter {
+	chain LIBVIRT_INP {
+	}
+
+	chain INPUT {
+		type filter hook input priority filter; policy accept;
+		counter packets 314 bytes 54716 jump LIBVIRT_INP
+	}
+
+	chain LIBVIRT_OUT {
+	}
+
+	chain OUTPUT {
+		type filter hook output priority filter; policy accept;
+		counter packets 16 bytes 1537 jump LIBVIRT_OUT
+	}
+
+	chain LIBVIRT_FWO {
+	}
+
+	chain FORWARD {
+		type filter hook forward priority filter; policy accept;
+		counter packets 0 bytes 0 jump LIBVIRT_FWX
+		counter packets 0 bytes 0 jump LIBVIRT_FWI
+		counter packets 0 bytes 0 jump LIBVIRT_FWO
+	}
+
+	chain LIBVIRT_FWI {
+	}
+
+	chain LIBVIRT_FWX {
+	}
+}
+table ip6 nat {
+	chain LIBVIRT_PRT {
+	}
+
+	chain POSTROUTING {
+		type nat hook postrouting priority srcnat; policy accept;
+		counter packets 0 bytes 0 jump LIBVIRT_PRT
+	}
+}
+table ip6 mangle {
+	chain LIBVIRT_PRT {
+	}
+
+	chain POSTROUTING {
+		type filter hook postrouting priority mangle; policy accept;
+		counter packets 28 bytes 2746 jump LIBVIRT_PRT
+	}
+}
