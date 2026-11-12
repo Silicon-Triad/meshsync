@@ -24,7 +24,9 @@ Concurrent fetches (issue #60): Node may run two fetch() calls for the same entr
 the entry arrives in two peers' INDEX). Every chunk a fetch asks for is claimed in a map shared
 by all fetches; another fetch that needs a claimed chunk waits for it instead of asking a peer
 again. When the owner stores it, the waiter counts it as done; when the owner gives up, its
-claims are released and the waiter asks for those chunks itself.
+claims are released and the waiter asks for those chunks itself. An owner that gives up may
+still have requests in flight; the waiter asks for those chunks again and the owner's late
+replies are dropped, so a few chunks can travel twice in that (failure-only) case.
 
 Threads: the calling thread does all bookkeeping and store.put. Reply futures complete on
 connection reader threads; their callback only frees the peer's slot and queues the result.
