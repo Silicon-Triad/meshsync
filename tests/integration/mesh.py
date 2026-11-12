@@ -99,6 +99,25 @@ class Peer:
             self.proc.wait()
         self.proc = None
 
+    def kill(self) -> None:
+        """SIGKILL: the peer vanishes without BYE or LEAVE (§10 "peer killed", #63)."""
+        if self.proc is None:
+            return
+        self.proc.kill()
+        self.proc.wait()
+        self.proc = None
+
+    def wait_log(self, text: str, what: str = "", timeout: float = SYNC_TIMEOUT) -> None:
+        """Wait until `text` is in this peer's log; on timeout the message holds the log tail."""
+        try:
+            wait_until(lambda: text in self.log_text(), what or repr(text), timeout)
+        except AssertionError as e:
+            raise AssertionError(f"{e}\n===== {self.name}\n{self.log_text()[-4000:]}") from None
+
+    def peer_id(self) -> str:
+        """Own peer_id, persisted by node.py in <dir>/.meshsync/peer_id (decision (l))."""
+        return (self.dir / ".meshsync" / "peer_id").read_text().strip()
+
     def path(self, rel: str) -> Path:
         return self.dir / rel
 
@@ -132,7 +151,13 @@ class Mesh:
         tls: bool = False,
         discovery: bool = False,
         isolated: bool = False,
+        own_secret: frozenset[str] = frozenset(),
+        cert_dir: dict[str, Path] | None = None,
+        plain: frozenset[str] = frozenset(),
     ) -> None:
+        """own_secret: these peers get a different random secret (§10 "wrong secret").
+        cert_dir: per-peer --cert-dir override, e.g. a rogue CA (§10 "untrusted cert").
+        plain: these peers run --plain even when tls=True (§10 "mode mismatch")."""
         self.root = root
         root.mkdir(parents=True)
         self.secret = root / "key"
@@ -155,9 +180,16 @@ class Mesh:
             (d / "data").mkdir(parents=True)
             self.peers[name] = Peer(name, d / "data", d / "peer.log", free_port())
         for p in self.peers.values():
-            mode = ["--tls", "--cert-dir", str(self.certs)] if tls else ["--plain"]
+            certs = (cert_dir or {}).get(p.name, self.certs)
+            use_tls = tls and p.name not in plain
+            mode = ["--tls", "--cert-dir", str(certs)] if use_tls else ["--plain"]
+            secret = self.secret
+            if p.name in own_secret:
+                secret = root / f"key-{p.name}"
+                secret.write_text(secrets.token_hex(SECRET_BYTES) + "\n")
+                secret.chmod(0o600)
             p.args = [
-                "--dir", str(p.dir), "--name", p.name, "--secret-file", str(self.secret),
+                "--dir", str(p.dir), "--name", p.name, "--secret-file", str(secret),
                 "--tcp-port", str(p.tcp_port), *mode, "--log-level", "DEBUG",
             ]  # fmt: skip
             if isolated:  # own discovery port, no static peers: sees nobody

@@ -11,7 +11,7 @@ from mesh import Mesh
 def make_mesh(tmp_path: Path) -> Iterator[Callable[..., Mesh]]:
     meshes: list[Mesh] = []
 
-    def make(names: list[str], **kw: bool) -> Mesh:
+    def make(names: list[str], **kw: object) -> Mesh:
         mesh = Mesh(tmp_path / f"mesh{len(meshes)}", names, **kw)
         meshes.append(mesh)
         return mesh

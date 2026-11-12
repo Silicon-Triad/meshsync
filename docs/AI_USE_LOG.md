@@ -31,3 +31,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-11 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | test data generator (#19): scripts/gen_testdata.py, tests/unit/test_gen_testdata.py; data set proposal on #25 | |
 | 2026-11-11 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | per-message metrics logger (#17): metrics/logger.py, record calls in net/connection.py, tests/unit/test_logger.py, test_connection.py | |
 | 2026-11-12 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | integration tests (#62): tests/integration/{mesh.py,conftest.py,test_sync.py,README.md}, integration marker in pyproject.toml | |
+| 2026-11-12 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | §10 failure-scenario integration tests (#63): tests/integration/test_failures.py, mesh.py additions (kill, wait_log, per-peer secret/cert dir/plain), README | |

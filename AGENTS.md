@@ -69,7 +69,7 @@ scripts/gen_testdata.py testdata --sets A,D      # measurement data, #25 (never 
 
 Not yet available: `scripts/run_local_mesh.sh` (added by #7),
 `scripts/measure/` runners (added by #20).
-`tests/integration/` is empty (no issue yet).
+`pytest -q tests/integration` runs the multi-peer localhost tests (#62, #63).
 
 CI (`.github/workflows/ci.yml`, checks `test (3.11)` and `test (3.12)`) runs on every PR and push
 to `main`: `pip install -e .[dev]`, `ruff check .`, `ruff format --check .`, `pytest -q`.
