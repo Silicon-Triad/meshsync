@@ -139,3 +139,109 @@ def test_place_removes_stage_when_copy_fails(tmp_path: Path) -> None:
 
 def test_new_columns_are_in_fields() -> None:
     assert {"e2e_from", "poll_s", "suspect"} <= set(mr.FIELDS)
+
+
+# ---------------------------------------------------------------- conditions 5 and 6 (#69)
+
+
+def test_setup_s_is_a_column_left_empty_by_other_experiments(tmp_path: Path) -> None:
+    assert mr.FIELDS[-1] == "setup_s"
+    out = tmp_path / "run1.csv"
+    mr.write_rows(out, [{f: "1" for f in mr.FIELDS if f != "setup_s"}])
+    assert out.read_text().splitlines()[1].endswith(",1,")  # empty setup_s cell
+
+
+LOG = (
+    "2026-11-12 20:33:22,251 INFO meshsync.__main__: config: ...\n"
+    "2026-11-12 20:33:22,260 INFO meshsync.net.manager: peer manager started: p2 on tcp 1 (tls)\n"
+    "2026-11-12 20:33:22,445 INFO meshsync.net.auth: responder handshake ok with p3 (AA)\n"
+    "2026-11-12 20:33:22,466 INFO meshsync.net.connection: connection to p3 is SYNCED\n"
+    "2026-11-12 20:33:23,010 INFO meshsync.net.connection: connection to p1 is SYNCED\n"
+)
+
+
+def test_setup_time_from_started_to_synced_with_the_source() -> None:
+    assert mr.setup_time(LOG, "p1") == pytest.approx(0.750)
+    assert mr.setup_time(LOG, "p3") == pytest.approx(0.206)
+    assert mr.setup_time(LOG, "p9") is None  # never SYNCED
+    assert mr.setup_time("connection to p1 is SYNCED\n", "p1") is None  # no start line
+
+
+def test_started_reads_the_log(tmp_path: Path) -> None:
+    p = mr.Peer("p2", tmp_path, 0)
+    assert not mr.started(p)  # no log yet
+    p.log.write_text(LOG)
+    assert mr.started(p)
+
+
+def test_peer_args_plain_vs_tls(tmp_path: Path) -> None:
+    mesh = mr.LocalMesh(tmp_path, 2, "cdc", 47000, 47000)
+    p1, p2 = mesh.peers
+    args = mesh.peer_args(p1)
+    assert "--plain" in args and "--tls" not in args
+    assert args[args.index("--peer") + 1] == f"127.0.0.1:{p2.port}"
+    mesh.tls = True  # what tls=True sets, without running gen_certs.sh here
+    args = mesh.peer_args(p1)
+    assert "--plain" not in args
+    assert args[args.index("--tls") + 1 : args.index("--tls") + 3] == [
+        "--cert-dir",
+        str(mesh.certs),
+    ]
+
+
+def ns(**kw: object) -> "mr.argparse.Namespace":
+    return mr.argparse.Namespace(**kw)
+
+
+def test_impaired_profiles_use_the_defaults() -> None:
+    profiles = mr.impaired_profiles(ns(loss_pct=mr.LOSS_PCT_DEFAULT, delay_ms=mr.DELAY_MS_DEFAULT))
+    assert profiles == [("clean", None), ("loss", ["loss", "5"]), ("delay", ["delay", "50"])]
+    assert mr.impaired_profiles(ns(loss_pct=2.5, delay_ms=20))[1:] == [
+        ("loss", ["loss", "2.5"]),
+        ("delay", ["delay", "20"]),
+    ]
+
+
+def test_netem_cmd_uses_sudo_only_when_not_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(mr.os, "geteuid", lambda: 0)
+    assert mr.netem_cmd("clear", "lo") == [str(mr.NETEM_SH), "clear", "lo"]
+    monkeypatch.setattr(mr.os, "geteuid", lambda: 1000)
+    assert mr.netem_cmd("clear", "lo") == ["sudo", "-n", str(mr.NETEM_SH), "clear", "lo"]
+
+
+def _record(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    calls: list[list[str]] = []
+    monkeypatch.setattr(mr.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(mr.subprocess, "run", lambda cmd, **kw: calls.append(cmd[1:]))
+    return calls
+
+
+def test_netem_applies_then_clears(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _record(monkeypatch)
+    with mr.netem("lo", ["loss", "5"]):
+        assert calls == [["clear", "lo"], ["apply", "lo", "loss", "5"]]
+    assert calls[-1] == ["clear", "lo"]
+
+
+def test_netem_clears_even_when_the_run_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _record(monkeypatch)
+    with pytest.raises(TimeoutError), mr.netem("lo", ["delay", "50"]):
+        raise TimeoutError("receiver never got the file")
+    assert calls[-1] == ["clear", "lo"]  # the link is never left impaired
+
+
+def test_netem_clean_profile_applies_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _record(monkeypatch)
+    with mr.netem("lo", None):
+        pass
+    assert calls == [["clear", "lo"], ["clear", "lo"]]
+
+
+def test_netem_profiles_match_netem_sh(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The arguments the runner builds must be accepted by netem.sh (dry run: no root, no tc).
+    monkeypatch.setenv("NETEM_DRY_RUN", "1")
+    for _, profile in mr.impaired_profiles(ns(loss_pct=5.0, delay_ms=50.0))[1:]:
+        out = mr.subprocess.run(
+            [str(mr.NETEM_SH), "apply", "lo", *profile], capture_output=True, text=True, check=True
+        )
+        assert out.stdout.startswith("tc qdisc replace dev lo root netem")

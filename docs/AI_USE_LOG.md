@@ -34,3 +34,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-12 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | §10 failure-scenario integration tests (#63): tests/integration/test_failures.py, mesh.py additions (kill, wait_log, per-peer secret/cert dir/plain), README | |
 | 2026-11-12 | Huzaifa Hanif | Claude Code (Opus 5.5) | measurement runner, §11 conditions 1-3 (#20): scripts/measure/run.py, peer.py, tests/unit/test_measure.py | |
 | 2026-11-12 | Huzaifa Hanif | Claude Code (Opus 5.5) | dedupe concurrent fetches (#60): transfer/scheduler.py, tests/unit/test_scheduler.py | |
+| 2026-11-12 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | §11 conditions 5-6 runners (#69): impaired and tls experiments, setup_s column, netem helpers in scripts/measure/run.py; tests in tests/unit/test_measure.py; README | |
