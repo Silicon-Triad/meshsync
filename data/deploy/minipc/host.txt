@@ -11,7 +11,6 @@ Python 3.13.5
     inet 127.0.0.1/8 scope host lo
        valid_lft forever preferred_lft forever
 3: wlp2s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
-    altname wlx0cdd24839a3c
     inet 192.168.100.190/24 brd 192.168.100.255 scope global noprefixroute wlp2s0
        valid_lft forever preferred_lft forever
 4: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 qdisc noqueue state UNKNOWN group default qlen 1000
