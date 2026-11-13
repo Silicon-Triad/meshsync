@@ -35,8 +35,12 @@ Columns (one host, one clock; bytes are application layer, header + body, see #5
               its "connection to <source> is SYNCED" line, from its own log (ms resolution):
               TCP connect, TLS handshake (tls mode), HMAC handshake and INDEX exchange.
 Condition 5 impairs --iface (default lo) with scripts/netem.sh, which needs root: run as root or
-with passwordless sudo. On lo every packet crosses the qdisc, so a D ms delay adds 2D ms to
-each round trip (both directions), unlike a delay on one laptop's Wi-Fi link.
+with passwordless sudo. On lo every packet crosses the qdisc in both directions, unlike netem on
+one laptop's Wi-Fi link (outgoing packets only):
+  delay  a D ms delay adds 2D ms to each round trip.
+  loss   data and the returning ACKs are each dropped with probability p, so a request/reply
+         exchange survives with (1 - p)^2: about 9.75 % fails at p = 5 %, not 5 %. The loss rows
+         are therefore harsher than a single 5 % link; say so wherever they are quoted.
 Test data comes from scripts/gen_testdata.py (data set decided in #25): sets A and D.
 Owner: Huzaifa Hanif (CS-24039).
 """

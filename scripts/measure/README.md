@@ -33,7 +33,9 @@ scripts/measure/run.py all --runs 5
   loss (`--loss-pct`, default 5 from §10), then delay (`--delay-ms`, default 50, decided on
   #69), on `--iface` (default `lo`). netem is applied after the mesh connects and always cleared
   afterwards, even when a run fails. Needs root or passwordless sudo, and a kernel with the
-  netem module. On `lo` a delay of D ms adds 2D ms per round trip (both directions cross it).
+  netem module. On `lo` both directions cross netem: a delay of D ms adds 2D ms per round trip,
+  and loss hits data and returning ACKs alike, so a request/reply exchange fails with
+  1 - (1 - p)^2 (about 9.75 % at p = 5 %), harsher than one 5 % Wi-Fi link (#79 review).
 - **Condition 6 (`tls`, #69):** set A in plain vs TLS mode (fresh certs per mesh from
   `gen_certs.sh`, under `data/raw/`). Adds the `setup_s` column (empty for other experiments):
   a receiver's "peer manager started" → "connection to <source> is SYNCED" from its own log
