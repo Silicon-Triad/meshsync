@@ -23,7 +23,8 @@ Wi-Fi MAC address).
 
 ## Hosts and IP addressing plan
 
-One Wi-Fi LAN, `192.168.100.0/24`, gateway `192.168.100.1`. Every host is on the same subnet,
+One Wi-Fi LAN, `192.168.100.0/24`, gateway `192.168.100.1`. This is the network we will
+demo on (confirmed with Muhammad Ahmed Qazi on 2026-11-13), as #67 requires. Every host is on the same subnet,
 so discovery broadcasts and TCP connections stay on the LAN (§14).
 
 | meshsync name | Machine | OS (kernel) | Python | Interface | IPv4 | Address from | Firewall |
