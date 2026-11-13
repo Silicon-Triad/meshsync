@@ -20,6 +20,14 @@ sends data that fails its SHA-256 check, and for all chunks when its connection 
 is the number of candidates left, so chunks with fewer possible sources are asked for first;
 ties keep file order, and peers are picked round-robin (D12).
 
+Concurrent fetches (issue #60): Node may run two fetch() calls for the same entry at once (e.g.
+the entry arrives in two peers' INDEX). Every chunk a fetch asks for is claimed in a map shared
+by all fetches; another fetch that needs a claimed chunk waits for it instead of asking a peer
+again. When the owner stores it, the waiter counts it as done; when the owner gives up, its
+claims are released and the waiter asks for those chunks itself. An owner that gives up may
+still have requests in flight; the waiter asks for those chunks again and the owner's late
+replies are dropped, so a few chunks can travel twice in that (failure-only) case.
+
 Threads: the calling thread does all bookkeeping and store.put. Reply futures complete on
 connection reader threads; their callback only frees the peer's slot and queues the result.
 There is no timeout here: a peer that stops answering is closed by the PING liveness check
@@ -32,6 +40,7 @@ import threading
 from collections import deque
 from collections.abc import Sequence
 from concurrent.futures import Future
+from dataclasses import dataclass
 from typing import Protocol
 
 from meshsync.net.connection import RemoteError
@@ -40,7 +49,14 @@ from meshsync.protocol.constants import MAX_OUTSTANDING_PER_PEER, MsgType
 
 log = logging.getLogger(__name__)
 
-_WAKE = object()  # queued to a waiting fetch when another fetch frees a peer slot
+_WAKE = object()  # queued to waiting fetches when a peer slot is freed
+
+
+@dataclass(frozen=True)
+class _Released:
+    """Queued to other fetches when this fetch drops its claim on these chunks (#60)."""
+
+    hashes: tuple[str, ...]
 
 
 class ChunkSink(Protocol):
@@ -59,6 +75,8 @@ class Scheduler:
         self._lock = threading.Lock()
         self._outstanding: dict[str, int] = {}
         self._waiters: set[queue.SimpleQueue] = set()
+        # chunk hash -> the event queue of the fetch() that is getting it (#60). Guarded by _lock.
+        self._claims: dict[str, queue.SimpleQueue] = {}
 
     # ------------------------------------------------------------ public (§8.3)
 
@@ -89,6 +107,7 @@ class Scheduler:
         struck: dict[str, set[str]] = {h: set() for h in missing}  # chunk -> peers not to ask
         dead: set[str] = set()
         inflight: dict[str, str] = {}  # chunk -> peer it was asked from
+        borrowed: set[str] = set()  # chunks another concurrent fetch is getting (#60)
         events: queue.SimpleQueue = queue.SimpleQueue()
         rr = 0  # round-robin position in rotation
 
@@ -99,6 +118,9 @@ class Scheduler:
             """Ask a peer for h (or drop it if already stored). False if no candidate is free."""
             nonlocal rr
             if self.store.has(h):  # another fetch stored it meanwhile
+                return True
+            if self._claimed_by_other(h, events):
+                borrowed.add(h)
                 return True
             while True:
                 cands = candidates(h)
@@ -111,6 +133,13 @@ class Scheduler:
                         break
                 else:
                     return False
+                # #60: claim only now that a request will go out, so a chunk we cannot ask for
+                # yet never makes another fetch wait. Checked again under the lock: another
+                # fetch may have claimed h since the check above.
+                if not self._claim(h, events):
+                    self._release_slot(pid)
+                    borrowed.add(h)
+                    return True
                 if self._request(by_id[pid], h, events):
                     inflight[h] = pid
                     return True
@@ -119,7 +148,7 @@ class Scheduler:
         with self._lock:
             self._waiters.add(events)
         try:
-            while fresh or retry or inflight:
+            while fresh or retry or inflight or borrowed:
                 # Rarest first: retried chunks by candidates left, ties in file order.
                 for h in sorted(retry, key=lambda c: (len(candidates(c)), order[c])):
                     if place(h):
@@ -128,12 +157,23 @@ class Scheduler:
                 # live peer), so once the head finds no free slot, none of the rest would.
                 while fresh and place(fresh[0]):
                     fresh.popleft()
-                if not (fresh or retry or inflight):
+                if not (fresh or retry or inflight or borrowed):
                     break
                 # Something is inflight (its reply or failure will arrive), or every free slot
-                # is held by another fetch(), whose release queues a _WAKE here.
-                self._handle(events.get(), retry, inflight, struck, dead)
+                # is held by another fetch(), whose release queues a _WAKE here, or we wait for
+                # borrowed chunks, whose owner queues a _Released here when it drops the claim.
+                event = events.get()
+                if isinstance(event, _Released):
+                    # Only the chunks named in the event are checked: rescanning every borrowed
+                    # chunk on every wake-up was quadratic (about 90 s for 1,400 chunks).
+                    for h in borrowed.intersection(event.hashes):
+                        borrowed.discard(h)
+                        if not self.store.has(h):  # its owner gave up: ours to get
+                            retry.add(h)
+                    continue
+                self._handle(event, events, retry, inflight, struck, dead)
         finally:
+            self._release_claims(events)
             with self._lock:
                 self._waiters.discard(events)
         log.info("fetched all chunks of %s", entry["path"])
@@ -159,6 +199,7 @@ class Scheduler:
     def _handle(
         self,
         event: object,
+        events: queue.SimpleQueue,
         retry: set[str],
         inflight: dict[str, str],
         struck: dict[str, set[str]],
@@ -185,11 +226,36 @@ class Scheduler:
             if msg_type != MsgType.CHUNK_DATA or not isinstance(body, bytes):
                 raise ValueError(f"expected CHUNK_DATA, got {msg_type!r}")
             self.store.put(h, body)  # verifies SHA-256 (§6.4, PROTOCOL.md §5.9)
+            self._release_claims(events, [h])  # stored: fetches waiting on it are done with it
         except ValueError as e:
             # CHUNK_CORRUPT (PROTOCOL.md §5.9, §10): discard, ask another peer.
             log.warning("CHUNK_CORRUPT: chunk %s from %s rejected: %s", h, pid, e)
             struck[h].add(pid)
             retry.add(h)
+
+    def _claim(self, h: str, events: queue.SimpleQueue) -> bool:
+        """Claim h for this fetch; False if another fetch holds it."""
+        with self._lock:
+            owner = self._claims.setdefault(h, events)
+        return owner is events
+
+    def _claimed_by_other(self, h: str, events: queue.SimpleQueue) -> bool:
+        with self._lock:
+            owner = self._claims.get(h)
+        return owner is not None and owner is not events
+
+    def _release_claims(self, events: queue.SimpleQueue, hashes: list[str] | None = None) -> None:
+        """Drop this fetch's claims (all, or the given ones) and tell the other fetches which."""
+        with self._lock:
+            keys = list(self._claims) if hashes is None else hashes
+            released = tuple(h for h in keys if self._claims.get(h) is events)
+            for h in released:
+                del self._claims[h]
+            waiters = [q for q in self._waiters if q is not events]
+        if released:
+            event = _Released(released)
+            for q in waiters:  # SimpleQueue.put never blocks
+                q.put(event)
 
     def _take_slot(self, pid: str) -> bool:
         with self._lock:
