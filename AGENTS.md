@@ -74,7 +74,7 @@ Not yet available: `scripts/run_local_mesh.sh` (added by #7), condition 4 in
 `pytest -q tests/integration` runs the multi-peer localhost tests (#62, #63).
 
 CI (`.github/workflows/ci.yml`, checks `test (3.11)` and `test (3.12)`) runs on every PR and push
-to `main`: `pip install -e .[dev]`, `ruff check .`, `ruff format --check .`, `pytest -q`.
+to `main`: `pip install -e .[dev,analysis]`, `ruff check .`, `ruff format --check .`, `pytest -q`.
 
 - **R-3.1** Run `scripts/check.sh` before pushing; it MUST pass.
 - **R-3.2** Docs MUST NOT show a command that does not exist yet without "(added by #N)".

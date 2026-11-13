@@ -7,7 +7,9 @@ Reads every data/<experiment>/run<k>.csv written by scripts/measure/run.py (#20,
 to --out:
   <experiment>.md / .csv   mean ± sample std dev and n per variant and metric (table for the report)
   <experiment>.pdf / .png  one bar chart with ±1 sd error bars for the experiment's comparison
-  savings.md               §13 bytes saved: delta vs full copy, CDC vs fixed after an insert
+  savings.md               §13 bytes saved: delta vs full copy, CDC vs fixed after an insert,
+                           counted twice: chunk data only, and every byte received (recv_bytes:
+                           NOTIFY with all chunk hashes, requests, PING/PONG as well)
 
 Statistics: a run's receivers share one mesh and one set of conditions, so they are averaged
 first; mean and sd are then taken over runs (n = runs, 5 per §11). Rows flagged suspect="dup"
@@ -38,6 +40,7 @@ METRICS: dict[str, str] = {
     "transfer_s": "transfer time (s)",
     "e2e_s": "end-to-end time (s)",
     "chunk_bytes": "chunk bytes received",
+    "recv_bytes": "total bytes received",
     "throughput_mbps": "throughput (MB/s)",
     "setup_s": "setup time (s)",
 }
@@ -119,17 +122,24 @@ def lookup(stats: list[Stat], variant: str, metric: str) -> Stat | None:
     return next((s for s in stats if s.variant == variant and s.metric == metric), None)
 
 
-def savings(all_stats: dict[str, list[Stat]]) -> list[tuple[str, float, float, float]]:
-    """§13: (comparison, baseline bytes, new bytes, % saved) from mean chunk_bytes."""
+# What a savings row counts: chunk data only, or every application-layer byte received. For a
+# small edit the NOTIFY carrying all chunk hashes can outweigh the chunk itself (#59 pilot), so
+# the chunk-only figure overstates the saving on the wire (#80 review).
+SAVINGS_BASIS = {"chunk_bytes": "chunk data only", "recv_bytes": "all bytes received"}
+
+
+def savings(all_stats: dict[str, list[Stat]]) -> list[tuple[str, str, float, float, float]]:
+    """§13: (comparison, counted, baseline bytes, new bytes, % saved) from mean bytes."""
     out = []
     for exp, base, new, label in (
         ("full_delta", "full", "delta", "delta vs full copy (1 KiB overwrite)"),
         ("fixed_cdc", "fixed", "cdc", "CDC vs fixed chunking (1 KiB insert at offset 0)"),
     ):
-        b = lookup(all_stats.get(exp, []), base, "chunk_bytes")
-        n = lookup(all_stats.get(exp, []), new, "chunk_bytes")
-        if b and n and b.mean > 0:
-            out.append((label, b.mean, n.mean, 100.0 * (1 - n.mean / b.mean)))
+        for metric, counted in SAVINGS_BASIS.items():
+            b = lookup(all_stats.get(exp, []), base, metric)
+            n = lookup(all_stats.get(exp, []), new, metric)
+            if b and n and b.mean > 0:
+                out.append((label, counted, b.mean, n.mean, 100.0 * (1 - n.mean / b.mean)))
     return out
 
 
@@ -156,10 +166,14 @@ def write_tables(out: Path, experiment: str, stats: list[Stat], dropped: int) ->
     (out / f"{experiment}.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def write_savings(out: Path, rows: list[tuple[str, float, float, float]]) -> None:
-    lines = ["### Bytes saved (§13)", "", "| comparison | baseline bytes | new bytes | saved |"]
-    lines.append("|---|---|---|---|")
-    lines += [f"| {c} | {fmt(b)} | {fmt(n)} | {p:.2f} % |" for c, b, n, p in rows]
+def write_savings(out: Path, rows: list[tuple[str, str, float, float, float]]) -> None:
+    lines = [
+        "### Bytes saved (§13)",
+        "",
+        "| comparison | counted | baseline bytes | new bytes | saved |",
+    ]
+    lines.append("|---|---|---|---|---|")
+    lines += [f"| {c} | {k} | {fmt(b)} | {fmt(n)} | {p:.2f} % |" for c, k, b, n, p in rows]
     out.mkdir(parents=True, exist_ok=True)
     (out / "savings.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -232,8 +246,8 @@ def main(argv: list[str] | None = None) -> int:
     sav = savings(all_stats)
     if sav:
         write_savings(args.out, sav)
-        for c, _, _, pct in sav:
-            log.info("saved %.2f %%: %s", pct, c)
+        for c, k, _, _, pct in sav:
+            log.info("saved %.2f %% (%s): %s", pct, k, c)
     return 0
 
 

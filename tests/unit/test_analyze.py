@@ -14,7 +14,7 @@ sys.modules["analyze"] = an  # dataclasses need the module registered
 _spec.loader.exec_module(an)
 
 COLS = ["experiment", "variant", "run", "receiver", "transfer_s", "e2e_s", "chunk_bytes",
-        "suspect", "setup_s"]  # fmt: skip
+        "recv_bytes", "suspect", "setup_s"]  # fmt: skip
 
 
 def write_run(data: Path, exp: str, run: int, rows: list[dict]) -> None:
@@ -73,17 +73,32 @@ def test_throughput_and_zero_transfer() -> None:
     )
 
 
-def test_savings_percentages() -> None:
+def test_savings_percentages_chunk_only_and_total() -> None:
     S = an.Stat  # noqa: N806
     stats = {
         "full_delta": [S("full_delta", "full", "chunk_bytes", 5, 1000.0, 0.0),
-                       S("full_delta", "delta", "chunk_bytes", 5, 10.0, 0.0)],
+                       S("full_delta", "delta", "chunk_bytes", 5, 10.0, 0.0),
+                       S("full_delta", "full", "recv_bytes", 5, 1100.0, 0.0),
+                       S("full_delta", "delta", "recv_bytes", 5, 110.0, 0.0)],
         "fixed_cdc": [S("fixed_cdc", "fixed", "chunk_bytes", 5, 200.0, 0.0),
                       S("fixed_cdc", "cdc", "chunk_bytes", 5, 50.0, 0.0)],
     }  # fmt: skip
-    got = {label.split()[0]: pct for label, _, _, pct in an.savings(stats)}
-    assert got == {"delta": pytest.approx(99.0), "CDC": pytest.approx(75.0)}
+    got = {(label.split()[0], counted): pct for label, counted, _, _, pct in an.savings(stats)}
+    assert got == {
+        ("delta", "chunk data only"): pytest.approx(99.0),
+        ("delta", "all bytes received"): pytest.approx(90.0),  # metadata counted too (#80)
+        ("CDC", "chunk data only"): pytest.approx(75.0),  # no recv_bytes: no total row claimed
+    }
     assert an.savings({}) == []  # experiments not run yet: nothing claimed
+
+
+def test_recv_bytes_is_summarized(tmp_path: Path) -> None:
+    write_run(tmp_path, "full_delta", 1, [R("delta", "p2", 0.0, 75667, recv_bytes="170000")])
+    rows, _ = an.load(tmp_path)
+    assert (
+        an.lookup(an.summarize("full_delta", rows["full_delta"]), "delta", "recv_bytes").mean
+        == 170000
+    )
 
 
 def test_tables_written(tmp_path: Path) -> None:
