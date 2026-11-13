@@ -298,3 +298,43 @@ def test_rarest_chunk_is_asked_first(store: ChunkStore) -> None:
         t.join(0.02)
     assert errors == []
     assert all(store.has(h) for h in hs)
+
+
+def test_concurrent_fetches_of_one_entry_request_each_chunk_once(store: ChunkStore) -> None:
+    # #60: the same entry arriving in two INDEX replies made Node run two fetches, and every
+    # chunk was downloaded twice.
+    ps = parts(20)
+    conn = FakeConn({sha(p): p for p in ps}, auto=False)
+    sched, p = Scheduler(store), peer("AAAAAAAA", conn)
+    entry = make_entry(ps)
+    t1, e1 = run_bg(lambda: sched.fetch(entry, [p]))
+    t2, e2 = run_bg(lambda: sched.fetch(entry, [p]))
+    while t1.is_alive() or t2.is_alive():
+        conn.answer(len(conn.pending))
+        t1.join(0.01)
+        t2.join(0.01)
+    assert e1 == [] and e2 == []
+    assert sorted(conn.requested) == sorted(entry["chunks"])  # once each, not twice
+    assert all(store.has(h) for h in entry["chunks"])
+
+
+def test_failed_owner_hands_its_chunks_to_the_waiting_fetch(store: ChunkStore) -> None:
+    # #60: if the fetch that claimed a chunk gives up, a concurrent fetch gets it itself.
+    ps = parts(12)
+    entry = make_entry(ps)
+    empty = FakeConn({}, auto=False)  # answers CHUNK_NOT_FOUND to everything
+    good = FakeConn({sha(p): p for p in ps})
+    sched = Scheduler(store)
+    t1, e1 = run_bg(lambda: sched.fetch(entry, [peer("AAAAAAAA", empty)]))
+    assert wait_until(lambda: len(empty.pending) == MAX_OUTSTANDING_PER_PEER)  # 8 claimed
+    t2, e2 = run_bg(lambda: sched.fetch(entry, [peer("BBBBBBBB", good)]))
+    assert wait_until(lambda: len(good.requested) == len(ps) - MAX_OUTSTANDING_PER_PEER)
+    time.sleep(0.05)
+    assert t2.is_alive()  # waiting for the 8 chunks the first fetch claimed
+    empty.answer(len(empty.pending))  # all NOT_FOUND: the first fetch raises, claims released
+    t1.join(WAIT)
+    t2.join(WAIT)
+    assert len(e1) == 1 and isinstance(e1[0], ConnectionError)
+    assert e2 == []
+    assert all(store.has(h) for h in entry["chunks"])
+    assert sorted(good.requested) == sorted(entry["chunks"])

@@ -33,3 +33,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-12 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | integration tests (#62): tests/integration/{mesh.py,conftest.py,test_sync.py,README.md}, integration marker in pyproject.toml | |
 | 2026-11-12 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | §10 failure-scenario integration tests (#63): tests/integration/test_failures.py, mesh.py additions (kill, wait_log, per-peer secret/cert dir/plain), README | |
 | 2026-11-12 | Huzaifa Hanif | Claude Code (Opus 5.5) | measurement runner, §11 conditions 1-3 (#20): scripts/measure/run.py, peer.py, tests/unit/test_measure.py | |
+| 2026-11-12 | Huzaifa Hanif | Claude Code (Opus 5.5) | dedupe concurrent fetches (#60): transfer/scheduler.py, tests/unit/test_scheduler.py | |
