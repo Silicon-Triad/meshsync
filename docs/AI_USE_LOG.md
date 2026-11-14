@@ -36,3 +36,4 @@ Record of every AI-assisted contribution, for the report's AI-use appendix (PROJ
 | 2026-11-12 | Huzaifa Hanif | Claude Code (Opus 5.5) | dedupe concurrent fetches (#60): transfer/scheduler.py, tests/unit/test_scheduler.py | |
 | 2026-11-12 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | §11 conditions 5-6 runners (#69): impaired and tls experiments, setup_s column, netem helpers in scripts/measure/run.py; tests in tests/unit/test_measure.py; README | |
 | 2026-11-12 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | analysis script (#71): analysis/analyze.py (tables, mean ± sd, §13 savings, matplotlib graphs), tests/unit/test_analyze.py, analysis extra in pyproject.toml, README | |
+| 2026-11-14 | Mujtaba Jawaid Rao | Claude Code (Opus 5.5) | network baseline (#70): scripts/measure/baseline.{sh,py}, tests/unit/test_baseline.py, step-by-step commands for the 3-host session, data/baseline/README.md written from the measured data, reuse-vs-reconnect derivation | |
