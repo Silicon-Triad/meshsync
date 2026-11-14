@@ -11,6 +11,8 @@
 # Needs ping and iperf3 on every host. Summarise with scripts/measure/baseline.py.
 # Env (method settings, not protocol values): RUNS (5, §11), PINGS per run (10),
 # IPERF_SECONDS per run (10, iperf3's default).
+# Resumable: a run whose result file already holds a result is skipped (FORCE=1 redoes it).
+# A failed run (host unreachable, iperf3 error) is logged and skipped, not fatal.
 set -euo pipefail
 
 usage() {
@@ -46,23 +48,39 @@ on() { # on TARGET CMD...: run CMD on this machine (empty TARGET) or over SSH
   fi
 }
 
+FORCE="${FORCE:-0}"
+failed=0
+
+done_already() { # done_already FILE PATTERN: FILE holds a result (re-run only with FORCE=1)
+  [[ "$FORCE" != "1" && -s "$1" ]] && grep -q "$2" "$1"
+}
+
 n="${#names[@]}"
 for ((s = 0; s < n; s++)); do
   for ((d = 0; d < n; d++)); do
     [[ "$s" -ne "$d" ]] || continue
     src="${names[$s]}" dst="${names[$d]}"
     for ((k = 1; k <= RUNS; k++)); do
+      f="$out/ping_${src}_${dst}_run${k}.txt"
+      if done_already "$f" "rtt min/avg"; then continue; fi
       echo "ping $src -> $dst run $k/$RUNS" >&2
-      on "${targets[$s]}" ping -c "$PINGS" "${ips[$d]}" >"$out/ping_${src}_${dst}_run${k}.txt"
+      if ! on "${targets[$s]}" ping -c "$PINGS" "${ips[$d]}" >"$f"; then
+        echo "  FAILED: ping $src -> $dst run $k (see $f); continuing" >&2
+        failed=$((failed + 1))
+      fi
     done
     # iperf3: one-off server on dst (-1 exits after one test, -D runs it in the background).
     for ((k = 1; k <= RUNS; k++)); do
+      f="$out/iperf3_${src}_${dst}_run${k}.json"
+      if done_already "$f" '"sum_received"'; then continue; fi
       echo "iperf3 $src -> $dst run $k/$RUNS" >&2
-      on "${targets[$d]}" iperf3 -s -1 -D
-      sleep 1
-      on "${targets[$s]}" iperf3 -c "${ips[$d]}" -t "$IPERF_SECONDS" -J \
-        >"$out/iperf3_${src}_${dst}_run${k}.json"
+      if ! { on "${targets[$d]}" iperf3 -s -1 -D && sleep 1 &&
+        on "${targets[$s]}" iperf3 -c "${ips[$d]}" -t "$IPERF_SECONDS" -J >"$f"; }; then
+        echo "  FAILED: iperf3 $src -> $dst run $k (see $f); continuing" >&2
+        failed=$((failed + 1))
+      fi
     done
   done
 done
-echo "done: $out (summarise: scripts/measure/baseline.py $out)" >&2
+echo "done: $out, $failed failed run(s) (summarise: scripts/measure/baseline.py $out)" >&2
+[[ "$failed" -eq 0 ]]
