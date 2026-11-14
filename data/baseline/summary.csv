@@ -1,0 +1,13 @@
+metric,src,dst,n,mean,sd
+rtt_ms,defalt,kratos,5,8.546,3.417
+rtt_ms,defalt,minipc,5,56.532,5.612
+rtt_ms,kratos,defalt,5,9.697,10.266
+rtt_ms,kratos,minipc,5,68.015,25.968
+rtt_ms,minipc,defalt,5,17.344,13.810
+rtt_ms,minipc,kratos,5,14.241,10.783
+throughput_mbps,defalt,kratos,5,7.662,1.259
+throughput_mbps,defalt,minipc,5,10.383,1.335
+throughput_mbps,kratos,defalt,5,16.583,0.781
+throughput_mbps,kratos,minipc,5,14.294,3.621
+throughput_mbps,minipc,defalt,5,10.449,2.631
+throughput_mbps,minipc,kratos,5,27.593,1.408

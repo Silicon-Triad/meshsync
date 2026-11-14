@@ -1,0 +1,15 @@
+PING 192.168.100.92 (192.168.100.92) 56(84) bytes of data.
+64 bytes from 192.168.100.92: icmp_seq=1 ttl=64 time=4.65 ms
+64 bytes from 192.168.100.92: icmp_seq=2 ttl=64 time=3.47 ms
+64 bytes from 192.168.100.92: icmp_seq=3 ttl=64 time=3.84 ms
+64 bytes from 192.168.100.92: icmp_seq=4 ttl=64 time=8.96 ms
+64 bytes from 192.168.100.92: icmp_seq=5 ttl=64 time=28.9 ms
+64 bytes from 192.168.100.92: icmp_seq=6 ttl=64 time=3.46 ms
+64 bytes from 192.168.100.92: icmp_seq=7 ttl=64 time=6.67 ms
+64 bytes from 192.168.100.92: icmp_seq=8 ttl=64 time=3.81 ms
+64 bytes from 192.168.100.92: icmp_seq=9 ttl=64 time=20.0 ms
+64 bytes from 192.168.100.92: icmp_seq=10 ttl=64 time=3.82 ms
+
+--- 192.168.100.92 ping statistics ---
+10 packets transmitted, 10 received, 0% packet loss, time 9015ms
+rtt min/avg/max/mdev = 3.461/8.759/28.888/8.261 ms

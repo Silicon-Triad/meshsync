@@ -1,0 +1,15 @@
+PING 192.168.100.80 (192.168.100.80) 56(84) bytes of data.
+64 bytes from 192.168.100.80: icmp_seq=1 ttl=64 time=6.08 ms
+64 bytes from 192.168.100.80: icmp_seq=2 ttl=64 time=5.48 ms
+64 bytes from 192.168.100.80: icmp_seq=3 ttl=64 time=7.72 ms
+64 bytes from 192.168.100.80: icmp_seq=4 ttl=64 time=5.66 ms
+64 bytes from 192.168.100.80: icmp_seq=5 ttl=64 time=5.72 ms
+64 bytes from 192.168.100.80: icmp_seq=6 ttl=64 time=51.4 ms
+64 bytes from 192.168.100.80: icmp_seq=7 ttl=64 time=27.4 ms
+64 bytes from 192.168.100.80: icmp_seq=8 ttl=64 time=13.4 ms
+64 bytes from 192.168.100.80: icmp_seq=9 ttl=64 time=18.9 ms
+64 bytes from 192.168.100.80: icmp_seq=10 ttl=64 time=6.03 ms
+
+--- 192.168.100.80 ping statistics ---
+10 packets transmitted, 10 received, 0% packet loss, time 9017ms
+rtt min/avg/max/mdev = 5.480/14.774/51.351/14.036 ms

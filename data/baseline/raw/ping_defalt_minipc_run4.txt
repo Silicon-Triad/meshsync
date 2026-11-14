@@ -1,0 +1,15 @@
+PING 192.168.100.190 (192.168.100.190) 56(84) bytes of data.
+64 bytes from 192.168.100.190: icmp_seq=1 ttl=64 time=3.37 ms
+64 bytes from 192.168.100.190: icmp_seq=2 ttl=64 time=71.0 ms
+64 bytes from 192.168.100.190: icmp_seq=3 ttl=64 time=92.8 ms
+64 bytes from 192.168.100.190: icmp_seq=4 ttl=64 time=11.1 ms
+64 bytes from 192.168.100.190: icmp_seq=5 ttl=64 time=34.0 ms
+64 bytes from 192.168.100.190: icmp_seq=6 ttl=64 time=56.9 ms
+64 bytes from 192.168.100.190: icmp_seq=7 ttl=64 time=80.1 ms
+64 bytes from 192.168.100.190: icmp_seq=8 ttl=64 time=103 ms
+64 bytes from 192.168.100.190: icmp_seq=9 ttl=64 time=23.1 ms
+64 bytes from 192.168.100.190: icmp_seq=10 ttl=64 time=45.3 ms
+
+--- 192.168.100.190 ping statistics ---
+10 packets transmitted, 10 received, 0% packet loss, time 9012ms
+rtt min/avg/max/mdev = 3.365/52.072/103.206/32.715 ms
