@@ -1,0 +1,38 @@
+## hostname
+Debian
+## os
+PRETTY_NAME="Debian GNU/Linux 13 (trixie)"
+VERSION_ID="13"
+Linux 6.12.113+deb13-amd64 x86_64
+## python (venv)
+Python 3.13.5
+## ip -4 addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+3: wlp2s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    inet 192.168.100.190/24 brd 192.168.100.255 scope global noprefixroute wlp2s0
+       valid_lft forever preferred_lft forever
+4: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 qdisc noqueue state UNKNOWN group default qlen 1000
+    inet 10.200.200.1/24 scope global wg0
+       valid_lft forever preferred_lft forever
+5: virbr1: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default qlen 1000
+    inet 10.10.10.1/24 brd 10.10.10.255 scope global virbr1
+       valid_lft forever preferred_lft forever
+## ip route
+default via 192.168.100.1 dev wlp2s0 proto static metric 600 
+10.10.10.0/24 dev virbr1 proto kernel scope link src 10.10.10.1 linkdown 
+10.200.200.0/24 dev wg0 proto kernel scope link src 10.200.200.1 
+192.168.100.0/24 dev wlp2s0 proto kernel scope link src 192.168.100.190 metric 600 
+## listening on meshsync ports (UDP 47000, TCP 47001)
+State  Recv-Q Send-Q Local Address:Port  Peer Address:Port
+UNCONN 0      0            0.0.0.0:47000      0.0.0.0:*   
+State  Recv-Q Send-Q Local Address:Port  Peer Address:Port
+LISTEN 0      128          0.0.0.0:47001      0.0.0.0:*   
+## firewall
+# Trimmed for #78 review: the full `nft list ruleset` (WireGuard and libvirt chains) is not needed.
+# No ufw. nftables, table ip filter:
+	chain INPUT {
+		type filter hook input priority filter; policy accept;
+	}
+# No rule in any chain matches UDP 47000 or TCP 47001, so both are accepted by the INPUT policy.

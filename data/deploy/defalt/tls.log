@@ -1,0 +1,8 @@
+2026-11-12 20:33:22,251 INFO meshsync.__main__: config: Config(sync_dir=PosixPath('/home/defalt/MeshSync'), name='defalt', secret_file=PosixPath('/home/defalt/.meshsync/key'), tls=True, cert_dir=PosixPath('/home/defalt/.meshsync/certs'), tcp_port=47001, udp_port=47000, chunking='cdc', peers=(), log_level='INFO')
+2026-11-12 20:33:22,260 INFO meshsync.net.manager: peer manager started: defalt on tcp 47001 (tls)
+2026-11-12 20:33:22,445 INFO meshsync.net.auth: responder handshake ok with minipc (9ED3EE39)
+2026-11-12 20:33:22,446 INFO meshsync.net.manager: peer up: minipc 192.168.100.190:0 (tls)
+2026-11-12 20:33:22,466 INFO meshsync.net.connection: connection to minipc is SYNCED
+2026-11-12 20:33:22,472 INFO meshsync.net.auth: responder handshake ok with kratos (76F6CF68)
+2026-11-12 20:33:22,473 INFO meshsync.net.manager: peer up: kratos 192.168.100.92:0 (tls)
+2026-11-12 20:33:22,488 INFO meshsync.net.connection: connection to kratos is SYNCED

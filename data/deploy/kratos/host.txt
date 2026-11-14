@@ -1,0 +1,46 @@
+## hostname
+kratos
+## os
+PRETTY_NAME="Omarchy"
+VERSION_ID="4.0.6"
+Linux 7.2.8-9-omarchy x86_64
+## python (venv)
+Python 3.14.8
+## ip -4 addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+3: wlp2s0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    inet 192.168.100.92/24 brd 192.168.100.255 scope global dynamic noprefixroute wlp2s0
+       valid_lft 78447sec preferred_lft 78447sec
+4: wg0: <POINTOPOINT,NOARP,UP,LOWER_UP> mtu 1420 qdisc noqueue state UNKNOWN group default qlen 1000
+    inet 10.200.200.2/32 scope global wg0
+       valid_lft forever preferred_lft forever
+## ip route
+default via 192.168.100.1 dev wlp2s0 proto dhcp src 192.168.100.92 metric 600 
+10.10.10.0/24 dev wg0 scope link 
+192.168.100.0/24 dev wlp2s0 proto kernel scope link src 192.168.100.92 metric 600 
+## listening on meshsync ports (UDP 47000, TCP 47001)
+State  Recv-Q Send-Q Local Address:Port  Peer Address:Port
+UNCONN 0      0            0.0.0.0:47000      0.0.0.0:*
+State  Recv-Q Send-Q Local Address:Port  Peer Address:Port
+LISTEN 0      128          0.0.0.0:47001      0.0.0.0:*
+## firewall
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), disabled (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+53317/udp                  ALLOW IN    Anywhere                  
+53317/tcp                  ALLOW IN    Anywhere                  
+172.17.0.1 53/udp          ALLOW IN    172.16.0.0/12              # allow-docker-dns
+172.17.0.1 53/udp          ALLOW IN    192.168.0.0/16             # allow-docker-dns
+47000/udp                  ALLOW IN    Anywhere                  
+47001/tcp                  ALLOW IN    Anywhere                  
+53317/udp (v6)             ALLOW IN    Anywhere (v6)             
+53317/tcp (v6)             ALLOW IN    Anywhere (v6)             
+47000/udp (v6)             ALLOW IN    Anywhere (v6)             
+47001/tcp (v6)             ALLOW IN    Anywhere (v6)             
+
