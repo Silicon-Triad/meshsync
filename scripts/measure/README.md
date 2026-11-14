@@ -2,7 +2,7 @@
 
 Experiment runners for the measurement plan (§11, R6).
 
-Owner: Huzaifa Hanif (@Huzaifa-Hanif-01). Related issues: #20.
+Owner: Huzaifa Hanif (@Huzaifa-Hanif-01). Related issues: #20, #69 (conditions 5-6).
 Rules: [`AGENTS.md`](../../AGENTS.md).
 
 ```bash
@@ -10,6 +10,8 @@ scripts/gen_testdata.py testdata --sets A,D          # once (#19, data set #25)
 scripts/measure/run.py full_delta                     # §11 condition 1, 5 runs
 scripts/measure/run.py fixed_cdc                      # condition 2 (backs D10)
 scripts/measure/run.py sources                        # condition 3
+sudo -E .venv/bin/python scripts/measure/run.py impaired   # condition 5 (netem needs root)
+scripts/measure/run.py tls                            # condition 6: plain vs TLS
 scripts/measure/run.py all --runs 5
 ```
 
@@ -27,3 +29,17 @@ scripts/measure/run.py all --runs 5
   them), `poll_s` (time resolution) and `suspect` (`dup` = chunks downloaded twice, #60; such
   rows must not be used). A failed run is logged and the batch continues, exiting 1 at the end;
   old `run<k>.csv` files are removed when a batch starts.
+- **Condition 5 (`impaired`, #69):** set A over a clean link, then with `scripts/netem.sh`
+  loss (`--loss-pct`, default 5 from §10), then delay (`--delay-ms`, default 50, decided on
+  #69), on `--iface` (default `lo`). netem is applied after the mesh connects and always cleared
+  afterwards, even when a run fails. Needs root or passwordless sudo, and a kernel with the
+  netem module. On `lo` both directions cross netem: a delay of D ms adds 2D ms per round trip,
+  and loss hits data and returning ACKs alike, so a request/reply exchange fails with
+  1 - (1 - p)^2 (about 9.75 % at p = 5 %), harsher than one 5 % Wi-Fi link (#79 review).
+- **Condition 6 (`tls`, #69):** set A in plain vs TLS mode (fresh certs per mesh from
+  `gen_certs.sh`, under `data/raw/`). Adds the `setup_s` column (empty for other experiments):
+  a receiver's "peer manager started" → "connection to <source> is SYNCED" from its own log
+  (ms resolution), i.e. TCP connect, TLS handshake, HMAC handshake and INDEX exchange.
+  Throughput is `chunk_bytes / transfer_s`, worked out in the analysis (#71).
+- Condition 4 (chunk size) is blocked on a frozen-interface decision; condition 7 (Wi-Fi vs
+  wired) needs the 3-host runner (#77).

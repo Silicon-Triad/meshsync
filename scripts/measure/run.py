@@ -2,7 +2,7 @@
 """Experiment runner for the measurement plan (PROJECT_CONTEXT.md §11, R6). Issue #20.
 
 Usage: scripts/measure/run.py EXPERIMENT [--runs 5] [--testdata testdata] [--data data]
-       EXPERIMENT: full_delta | fixed_cdc | sources | all
+       EXPERIMENT: full_delta | fixed_cdc | sources | impaired | tls | all
 
 SINGLE HOST ONLY: every peer runs on this machine (127.0.0.1). The runner for the 3 laptops is
 issue #77; until then these numbers are pilots, and all peers share this machine's CPUs and disk
@@ -12,6 +12,8 @@ Experiments (§11 conditions 1-3, plain mode):
   full_delta  condition 1: sync set A's 100 MiB file (full), then its 1 KiB overwrite (delta)
   fixed_cdc   condition 2: A, then the 1 KiB insert at offset 0, with --chunking fixed vs cdc
   sources     condition 3: a fresh peer joins and fetches A from one holder vs two holders
+  impaired    condition 5: A over a clean link, then with netem loss, then netem delay (#69)
+  tls         condition 6: A in plain vs TLS mode, plus each receiver's setup time (#69)
 
 Each run starts a fresh mesh (new folders, empty chunk stores) under data/raw/ (gitignored),
 runs every peer through scripts/measure/peer.py so it writes its metrics CSV (#17), and writes
@@ -29,6 +31,16 @@ Columns (one host, one clock; bytes are application layer, header + body, see #5
               use --peers 2 for a point-to-point number)
   suspect     "dup" if chunk_bytes > 1.1 x file size: chunks were downloaded more than once
               (#60). Such rows must not be used; condition 3 retries the run instead.
+  setup_s     condition 6 only (empty elsewhere): a receiver's "peer manager started" log line ->
+              its "connection to <source> is SYNCED" line, from its own log (ms resolution):
+              TCP connect, TLS handshake (tls mode), HMAC handshake and INDEX exchange.
+Condition 5 impairs --iface (default lo) with scripts/netem.sh, which needs root: run as root or
+with passwordless sudo. On lo every packet crosses the qdisc in both directions, unlike netem on
+one laptop's Wi-Fi link (outgoing packets only):
+  delay  a D ms delay adds 2D ms to each round trip.
+  loss   data and the returning ACKs are each dropped with probability p, so a request/reply
+         exchange survives with (1 - p)^2: about 9.75 % fails at p = 5 %, not 5 %. The loss rows
+         are therefore harsher than a single 5 % link; say so wherever they are quoted.
 Test data comes from scripts/gen_testdata.py (data set decided in #25): sets A and D.
 Owner: Huzaifa Hanif (CS-24039).
 """
@@ -48,8 +60,10 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 from meshsync.net.auth import SECRET_BYTES
@@ -80,9 +94,16 @@ FIELDS = (
     "e2e_from",
     "poll_s",
     "suspect",
+    "setup_s",
 )
+NETEM_SH = REPO / "scripts" / "netem.sh"
+GEN_CERTS_SH = REPO / "scripts" / "gen_certs.sh"
+LOSS_PCT_DEFAULT = 5.0  # §10: "5 % loss via netem"
+DELAY_MS_DEFAULT = 50.0  # condition 5 delay: team decision recorded on #69
 DUP_FACTOR = 1.1  # harness check: more chunk bytes than this x file size = duplicate downloads
 _SYNCED_RE = re.compile(r"connection to (\S+) is SYNCED")
+_LOG_TS = r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d{3}) "  # logging's default asctime
+_STARTED_RE = re.compile(_LOG_TS + r".*peer manager started", re.M)
 
 
 # ---------------------------------------------------------------- metrics CSV (pure, tested)
@@ -206,9 +227,17 @@ class LocalMesh:
     """N peers on this machine, every one listed as a static peer of the others (§14)."""
 
     def __init__(
-        self, base: Path, n: int, chunking: str, tcp_base: int, udp_port: int, keep: bool = False
+        self,
+        base: Path,
+        n: int,
+        chunking: str,
+        tcp_base: int,
+        udp_port: int,
+        keep: bool = False,
+        tls: bool = False,
     ) -> None:
         self.base = base
+        self.tls = tls
         self.keep = keep  # keep the sync folders (and their 100 MiB copies) after the run
         self.chunking = chunking
         self.udp_port = udp_port
@@ -221,20 +250,29 @@ class LocalMesh:
         self.peers = [Peer(f"p{k}", base / f"p{k}", tcp_base + k) for k in range(1, n + 1)]
         for p in self.peers:
             p.data.mkdir(parents=True, exist_ok=True)
+        self.certs = base / "certs"  # under data/raw/ (gitignored); fresh CA per mesh
+        if tls:
+            names = [p.name for p in self.peers]
+            subprocess.run(
+                [str(GEN_CERTS_SH), str(self.certs), *names],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            )  # fmt: skip
+
+    def peer_args(self, p: Peer) -> list[str]:
+        """The peer.py command line for p: every other peer is a static peer (§14)."""
+        statics = [a for q in self.peers if q is not p for a in ("--peer", f"127.0.0.1:{q.port}")]
+        mode = ["--tls", "--cert-dir", str(self.certs)] if self.tls else ["--plain"]
+        return [
+            sys.executable, str(PEER_PY), str(p.csv), "--",
+            "--dir", str(p.data), "--name", p.name, "--secret-file", str(self.key),
+            "--config", str(self.config), *mode, "--chunking", self.chunking,
+            "--tcp-port", str(p.port), "--udp-port", str(self.udp_port), *statics,
+        ]  # fmt: skip
 
     def start(self, peers: list[Peer] | None = None) -> None:
         for p in peers or self.peers:
-            statics = [
-                a for q in self.peers if q is not p for a in ("--peer", f"127.0.0.1:{q.port}")
-            ]
-            args = [
-                sys.executable, str(PEER_PY), str(p.csv), "--",
-                "--dir", str(p.data), "--name", p.name, "--secret-file", str(self.key),
-                "--config", str(self.config), "--plain", "--chunking", self.chunking,
-                "--tcp-port", str(p.port), "--udp-port", str(self.udp_port), *statics,
-            ]  # fmt: skip
             with p.log.open("w") as out:
-                p.proc = subprocess.Popen(args, stdout=out, stderr=subprocess.STDOUT)
+                p.proc = subprocess.Popen(self.peer_args(p), stdout=out, stderr=subprocess.STDOUT)
 
     def stop(self) -> None:
         running = [p for p in self.peers if p.proc and p.proc.poll() is None]
@@ -281,6 +319,30 @@ def connected(p: Peer, others: list[Peer]) -> bool:
     except FileNotFoundError:
         return False
     return {q.name for q in others} <= names
+
+
+def _log_time(stamp: str) -> float:
+    return datetime.strptime(stamp, "%Y-%m-%d %H:%M:%S,%f").timestamp()
+
+
+def setup_time(log_text: str, other: str) -> float | None:
+    """Seconds from "peer manager started" to "connection to <other> is SYNCED" (condition 6).
+
+    Both lines come from the same process clock, so the difference needs no clock sync.
+    None when either line is missing.
+    """
+    started = _STARTED_RE.search(log_text)
+    synced = re.search(_LOG_TS + rf".*connection to {re.escape(other)} is SYNCED", log_text, re.M)
+    if not started or not synced:
+        return None
+    return _log_time(synced.group(1)) - _log_time(started.group(1))
+
+
+def started(p: Peer) -> bool:
+    try:
+        return _STARTED_RE.search(p.log.read_text(errors="replace")) is not None
+    except FileNotFoundError:
+        return False
 
 
 def indexed(p: Peer, rel: str, sha: str) -> bool:
@@ -417,12 +479,13 @@ def push(
 
 
 def new_mesh(
-    args: argparse.Namespace, exp: str, run: int, tag: str, n: int, chunking: str
-) -> LocalMesh:
+    args: argparse.Namespace, exp: str, run: int, tag: str, n: int, chunking: str,
+    tls: bool = False,
+) -> LocalMesh:  # fmt: skip
     base = args.data / "raw" / exp / f"run{run}" / tag
     if base.exists():
         shutil.rmtree(base)
-    return LocalMesh(base, n, chunking, args.tcp_base, args.udp_port, args.keep_data)
+    return LocalMesh(base, n, chunking, args.tcp_base, args.udp_port, args.keep_data, tls)
 
 
 def start_connected(mesh: LocalMesh, peers: list[Peer], args: argparse.Namespace) -> None:
@@ -501,10 +564,91 @@ def exp_sources(run: int, args: argparse.Namespace, manifest: dict[str, str]) ->
     return rows
 
 
+# ---------------------------------------------------------------- condition 5: netem (#69)
+
+
+def netem_cmd(*args: str) -> list[str]:
+    """scripts/netem.sh with args; through `sudo -n` when not root (fails fast, never prompts)."""
+    cmd = [str(NETEM_SH), *args]
+    return cmd if os.geteuid() == 0 else ["sudo", "-n", *cmd]
+
+
+def impaired_profiles(args: argparse.Namespace) -> list[tuple[str, list[str] | None]]:
+    """(variant, netem.sh apply arguments) for condition 5; None = clean link."""
+    return [
+        ("clean", None),
+        ("loss", ["loss", f"{args.loss_pct:g}"]),
+        ("delay", ["delay", f"{args.delay_ms:g}"]),
+    ]
+
+
+@contextmanager
+def netem(iface: str, profile: list[str] | None) -> Iterator[None]:
+    """Impair iface for the duration of the block; always cleared afterwards, even on errors."""
+    subprocess.run(netem_cmd("clear", iface), check=True)
+    try:
+        if profile is not None:
+            subprocess.run(netem_cmd("apply", iface, *profile), check=True)
+            log.info("netem on %s: %s", iface, " ".join(profile))
+        yield
+    finally:
+        subprocess.run(netem_cmd("clear", iface), check=True)
+
+
+def exp_impaired(run: int, args: argparse.Namespace, manifest: dict[str, str]) -> list[dict]:
+    """§11 condition 5: A over a clean link, then with netem loss, then netem delay.
+
+    The mesh connects on a clean link; netem is applied just before A is placed and cleared
+    as soon as every receiver has it, so only the data transfer is impaired.
+    """
+    rows: list[dict] = []
+    for variant, profile in impaired_profiles(args):
+        with new_mesh(args, "impaired", run, variant, args.peers, "cdc") as mesh:
+            src, *rcv = mesh.peers
+            start_connected(mesh, mesh.peers, args)
+            with netem(args.iface, profile):
+                rows += push(Step("impaired", variant, run, A), mesh, src, rcv, args, manifest)
+    return rows
+
+
+# ---------------------------------------------------------------- condition 6: plain vs TLS (#69)
+
+
+def exp_tls(run: int, args: argparse.Namespace, manifest: dict[str, str]) -> list[dict]:
+    """§11 condition 6: setup time and transfer of A in plain vs TLS mode (§12 security tension).
+
+    The source starts first; each receiver then starts alone and dials the peers already up,
+    so its setup_s (started -> SYNCED with the source) is not inflated by a reconnect wait.
+    """
+    rows: list[dict] = []
+    for mode in ("plain", "tls"):
+        with new_mesh(args, "tls", run, mode, args.peers, "cdc", tls=mode == "tls") as mesh:
+            src, *rcv = mesh.peers
+            mesh.start([src])
+            wait_until(lambda s=src: started(s), args.timeout, args.poll, f"{src.name} start", mesh)
+            up = [src]
+            for r in rcv:
+                mesh.start([r])
+                wait_until(lambda r=r, u=list(up): connected(r, u), args.timeout, args.poll,
+                           f"{r.name} links", mesh)  # fmt: skip
+                up.append(r)
+            for p in up:  # every link SYNCED before timing the transfer
+                others = [q for q in up if q is not p]
+                wait_until(lambda p=p, o=others: connected(p, o), args.timeout, args.poll,
+                           "links", mesh)  # fmt: skip
+            got = push(Step("tls", mode, run, A), mesh, src, rcv, args, manifest)
+            for row, r in zip(got, rcv, strict=True):
+                row["setup_s"] = fmt(setup_time(r.log.read_text(errors="replace"), src.name))
+            rows += got
+    return rows
+
+
 EXPERIMENTS: dict[str, Callable[[int, argparse.Namespace, dict[str, str]], list[dict]]] = {
     "full_delta": exp_full_delta,
     "fixed_cdc": exp_fixed_cdc,
     "sources": exp_sources,
+    "impaired": exp_impaired,
+    "tls": exp_tls,
 }
 
 
@@ -539,6 +683,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--poll", type=float, default=0.05, help="seconds between checks (harness)")
     p.add_argument("--keep-data", action="store_true", help="keep sync folders under data/raw/")
     p.add_argument("--retries", type=int, default=3, help="extra attempts for a 2src run")
+    p.add_argument("--iface", default="lo", help="interface netem impairs (condition 5)")
+    p.add_argument("--loss-pct", type=float, default=LOSS_PCT_DEFAULT,
+                   help="condition 5 loss %% (default 5, §10)")  # fmt: skip
+    p.add_argument("--delay-ms", type=float, default=DELAY_MS_DEFAULT,
+                   help="condition 5 delay ms (default 50, #69)")  # fmt: skip
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 

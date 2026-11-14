@@ -68,8 +68,8 @@ scripts/gen_testdata.py testdata --sets A,D      # measurement data, #25 (never 
 scripts/measure/run.py full_delta --runs 5        # §11 runs -> data/<experiment>/ (#20)
 ```
 
-Not yet available: `scripts/run_local_mesh.sh` (added by #7), conditions 4-6 in
-`scripts/measure/run.py` (§11 conditions 1-3 are available on one host, added by #20).
+Not yet available: `scripts/run_local_mesh.sh` (added by #7), condition 4 in
+`scripts/measure/run.py` (§11 conditions 1-3 added by #20, 5-6 by #69; one host only).
 `pytest -q tests/integration` runs the multi-peer localhost tests (#62, #63).
 
 CI (`.github/workflows/ci.yml`, checks `test (3.11)` and `test (3.12)`) runs on every PR and push
