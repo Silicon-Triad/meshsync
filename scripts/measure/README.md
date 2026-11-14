@@ -2,7 +2,7 @@
 
 Experiment runners for the measurement plan (§11, R6).
 
-Owner: Huzaifa Hanif (@Huzaifa-Hanif-01). Related issues: #20, #69 (conditions 5-6).
+Owner: Huzaifa Hanif (@Huzaifa-Hanif-01). Related issues: #20, #69 (conditions 5-6), #70 (baseline).
 Rules: [`AGENTS.md`](../../AGENTS.md).
 
 ```bash
@@ -43,3 +43,8 @@ scripts/measure/run.py all --runs 5
   Throughput is `chunk_bytes / transfer_s`, worked out in the analysis (#71).
 - Condition 4 (chunk size) is blocked on a frozen-interface decision; condition 7 (Wi-Fi vs
   wired) needs the 3-host runner (#77).
+- **Network baseline (#70):** `baseline.sh OUTDIR NAME:IP[:SSH_TARGET] ...` runs `ping` and
+  `iperf3` between every ordered pair of hosts (5 runs, §11) from one host over SSH; resumable,
+  a failed run is logged and re-run next time. `baseline.py RAW_DIR --out data/baseline
+  [--metrics NAME=CSV ...]` writes per-run CSVs, mean ± sd per pair, and the meshsync PING/PONG
+  cross-check from `peer.py` metrics CSVs. Results: `data/baseline/README.md`.
