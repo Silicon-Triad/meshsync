@@ -11,6 +11,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
+analysis = ["matplotlib>=3.8"]  # D15: analysis-only dependency (#71), not runtime
 
 [project.scripts]
 meshsync = "meshsync.__main__:main"

@@ -66,6 +66,7 @@ bash -n scripts/*.sh             # shell syntax check
 scripts/gen_certs.sh certs ahmed mujtaba huzaifa   # TLS certs (never commit)
 scripts/gen_testdata.py testdata --sets A,D      # measurement data, #25 (never commit)
 scripts/measure/run.py full_delta --runs 5        # §11 runs -> data/<experiment>/ (#20)
+analysis/analyze.py              # data/ -> tables + graphs in analysis/out/ (#71)
 ```
 
 Not yet available: `scripts/run_local_mesh.sh` (added by #7), condition 4 in
@@ -73,7 +74,7 @@ Not yet available: `scripts/run_local_mesh.sh` (added by #7), condition 4 in
 `pytest -q tests/integration` runs the multi-peer localhost tests (#62, #63).
 
 CI (`.github/workflows/ci.yml`, checks `test (3.11)` and `test (3.12)`) runs on every PR and push
-to `main`: `pip install -e .[dev]`, `ruff check .`, `ruff format --check .`, `pytest -q`.
+to `main`: `pip install -e .[dev,analysis]`, `ruff check .`, `ruff format --check .`, `pytest -q`.
 
 - **R-3.1** Run `scripts/check.sh` before pushing; it MUST pass.
 - **R-3.2** Docs MUST NOT show a command that does not exist yet without "(added by #N)".

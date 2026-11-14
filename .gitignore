@@ -27,3 +27,6 @@ data/raw/
 
 # measurement test data (scripts/gen_testdata.py, #19)
 testdata/
+
+# analysis output (#71); committed only once real data exists
+analysis/out/
