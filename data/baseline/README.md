@@ -3,8 +3,8 @@
 RTT (`ping`) and the throughput ceiling (`iperf3`) for every ordered pair of hosts, cross-checked
 with meshsync's own liveness PING/PONG. Issue #70.
 
-Owner: Huzaifa Hanif (@Huzaifa-Hanif-01); this session was run by Mujtaba Jawaid Rao during
-Huzaifa's exams. Related issues: #70, #71 (analysis), #67 (hosts, `data/deploy/`).
+Owner: Huzaifa Hanif (@Huzaifa-Hanif-01); this session was run by Mujtaba Jawaid Rao.
+Related issues: #70, #71 (analysis), #67 (hosts, `data/deploy/`).
 Rules: [`AGENTS.md`](../../AGENTS.md).
 
 Session date: 2026-11-14, on the demo network (`192.168.100.0/24`, see `data/deploy/README.md`).

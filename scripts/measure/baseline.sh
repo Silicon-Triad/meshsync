@@ -6,7 +6,7 @@
 # Usage: scripts/measure/baseline.sh OUTDIR NAME:IP[:SSH_TARGET] NAME:IP[:SSH_TARGET] ...
 #   A host without SSH_TARGET is this machine. Example:
 #   scripts/measure/baseline.sh data/baseline/raw kratos:192.168.100.92 \
-#     minipc:192.168.100.190:kratos@192.168.100.190 defalt:192.168.100.80:eemaan@192.168.100.80
+#     minipc:192.168.100.190:user@192.168.100.190 defalt:192.168.100.80:user@192.168.100.80
 # Writes OUTDIR/ping_<src>_<dst>_run<k>.txt and OUTDIR/iperf3_<src>_<dst>_run<k>.json.
 # Needs ping and iperf3 on every host. Summarise with scripts/measure/baseline.py.
 # Env (method settings, not protocol values): RUNS (5, §11), PINGS per run (10),
