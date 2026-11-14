@@ -1,0 +1,12 @@
+2026-11-14 14:03:01,353 INFO meshsync.__main__: config: Config(sync_dir=PosixPath('/home/defalt/cap5'), name='defalt', secret_file=PosixPath('/home/defalt/.meshsync/key'), tls=False, cert_dir=None, tcp_port=47001, udp_port=47000, chunking='cdc', peers=(), log_level='INFO')
+2026-11-14 14:03:01,361 INFO meshsync.net.manager: peer manager started: defalt on tcp 47001 (plain)
+2026-11-14 14:03:01,425 INFO meshsync.net.auth: responder handshake ok with kratos (2E7DC50C)
+2026-11-14 14:03:01,426 INFO meshsync.net.manager: peer up: kratos 192.168.100.92:0 (plain)
+2026-11-14 14:03:01,466 INFO meshsync.net.connection: connection to kratos is SYNCED
+2026-11-14 14:03:33,325 INFO meshsync.transfer.scheduler: fetching part.bin: 144 of 144 chunks from 1 peers
+2026-11-14 14:04:00,376 INFO meshsync.net.discovery: peer 2E7DC50C (kratos) expired
+2026-11-14 14:04:30,946 INFO meshsync.transfer.scheduler: fetched all chunks of part.bin
+2026-11-14 14:04:31,047 INFO meshsync.transfer.assembler: assembled part.bin (10485760 bytes, 144 chunks)
+2026-11-14 14:04:55,384 INFO meshsync.net.discovery: peer 2E7DC50C (kratos) expired
+2026-11-14 14:06:33,698 INFO meshsync.net.connection: closing connection to kratos: peer sent BYE: shutdown
+2026-11-14 14:06:33,698 INFO meshsync.net.manager: peer down: kratos 192.168.100.92 (plain): peer sent BYE: shutdown

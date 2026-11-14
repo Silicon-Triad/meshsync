@@ -1,0 +1,8 @@
+2026-11-14 13:38:51,206 INFO meshsync.__main__: config: Config(sync_dir=PosixPath('/home/defalt/cap2'), name='defalt', secret_file=PosixPath('/home/defalt/.meshsync/wrongkey'), tls=False, cert_dir=None, tcp_port=47001, udp_port=47000, chunking='cdc', peers=(), log_level='INFO')
+2026-11-14 13:38:51,215 INFO meshsync.net.manager: peer manager started: defalt on tcp 47001 (plain)
+2026-11-14 13:38:53,561 WARNING meshsync.net.discovery: drop D5A6E688 from 192.168.100.92: bad tag
+2026-11-14 13:38:58,562 WARNING meshsync.net.discovery: drop D5A6E688 from 192.168.100.92: bad tag
+2026-11-14 13:39:03,564 WARNING meshsync.net.discovery: drop D5A6E688 from 192.168.100.92: bad tag
+2026-11-14 13:39:08,564 WARNING meshsync.net.discovery: drop D5A6E688 from 192.168.100.92: bad tag
+2026-11-14 13:39:13,579 WARNING meshsync.net.discovery: drop D5A6E688 from 192.168.100.92: bad tag
+2026-11-14 13:39:14,583 WARNING meshsync.net.discovery: drop D5A6E688 from 192.168.100.92: bad tag

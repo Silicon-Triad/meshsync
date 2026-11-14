@@ -1,0 +1,11 @@
+2026-11-14 18:57:23,555 INFO meshsync.__main__: config: Config(sync_dir=PosixPath('/home/kratos/cap4'), name='kratos', secret_file=PosixPath('/home/kratos/.meshsync/key'), tls=False, cert_dir=None, tcp_port=47001, udp_port=47000, chunking='cdc', peers=(), log_level='INFO')
+2026-11-14 18:57:23,562 INFO meshsync.net.manager: peer manager started: kratos on tcp 47001 (plain)
+2026-11-14 18:57:30,275 INFO meshsync.net.auth: initiator handshake ok with defalt (EFA1E2C7)
+2026-11-14 18:57:30,276 INFO meshsync.net.manager: peer up: defalt 192.168.100.80:47001 (plain)
+2026-11-14 18:57:30,292 INFO meshsync.net.connection: connection to defalt is SYNCED
+2026-11-14 18:58:54,560 INFO meshsync.net.connection: closing connection to defalt: ConnectionError: peer closed connection
+2026-11-14 18:58:54,560 INFO meshsync.net.manager: peer down: defalt 192.168.100.80 (plain): ConnectionError: peer closed connection
+2026-11-14 18:59:05,614 INFO meshsync.net.discovery: peer EFA1E2C7 (defalt) expired
+2026-11-14 18:59:21,367 INFO meshsync.net.auth: initiator handshake ok with defalt (EFA1E2C7)
+2026-11-14 18:59:21,368 INFO meshsync.net.manager: peer up: defalt 192.168.100.80:47001 (plain)
+2026-11-14 18:59:21,398 INFO meshsync.net.connection: connection to defalt is SYNCED
