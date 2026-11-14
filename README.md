@@ -46,7 +46,11 @@ udp_port = 47000
 chunking = "cdc"                # or "fixed"
 peers = ["192.168.1.12:47001"]  # optional static peers
 log_level = "INFO"
+metrics_csv = "run.csv"         # optional; off if unset
 ```
+
+`--metrics-csv PATH` (or `metrics_csv`) writes one CSV row per message sent or received
+(`t,direction,peer,type,size`, §11). Each run overwrites the file and writes the header first.
 
 ## Tests and lint
 

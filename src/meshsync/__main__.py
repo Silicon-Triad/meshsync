@@ -10,7 +10,8 @@ import sys
 import threading
 from pathlib import Path
 
-from meshsync.config import CHUNKING_MODES, ConfigError, load_config
+from meshsync.config import CHUNKING_MODES, Config, ConfigError, load_config
+from meshsync.metrics.logger import CSV_HEADER, CSV_LOGGER
 from meshsync.node import ComponentsMissing, build_node
 from meshsync.protocol.constants import TCP_PORT, UDP_PORT
 
@@ -38,10 +39,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     run.add_argument("--config", type=Path, help="config file (default ~/.meshsync/config.toml)")
     run.add_argument("--log-level", help="DEBUG, INFO, WARNING, ERROR (default INFO)")
+    run.add_argument(
+        "--metrics-csv",
+        type=Path,
+        metavar="PATH",
+        help="write one CSV row per message to PATH, overwriting it (default off; §11)",
+    )
 
     sub.add_parser("status", help="show peers and sync state")
     sub.add_parser("stats", help="show transfer statistics")
     return parser
+
+
+def open_metrics_csv(path: Path) -> logging.FileHandler:
+    """Overwrite PATH, write CSV_HEADER, attach a handler to the metrics CSV logger (§11, #72).
+
+    One fresh file per run, as §11 stores one file per run; the caller removes the handler.
+    """
+    try:
+        handler = logging.FileHandler(path, mode="w", encoding="utf-8")
+    except OSError as e:
+        raise ConfigError(f"cannot open metrics CSV {path}: {e.strerror or e}") from e
+    handler.stream.write(CSV_HEADER + "\n")
+    handler.stream.flush()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logging.getLogger(CSV_LOGGER).addHandler(handler)
+    return handler
+
+
+def close_metrics_csv(handler: logging.FileHandler | None) -> None:
+    if handler is not None:
+        logging.getLogger(CSV_LOGGER).removeHandler(handler)
+        handler.close()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -55,12 +84,20 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     try:
         config = load_config(args)
+        metrics = open_metrics_csv(config.metrics_csv) if config.metrics_csv else None
     except ConfigError as e:
         print(f"meshsync: config error: {e}", file=sys.stderr)
         return 2
 
     logging.getLogger().setLevel(config.log_level)
     log.info("config: %s", config)  # holds the secret's path only, never its contents
+    try:
+        return run_node(config)
+    finally:
+        close_metrics_csv(metrics)
+
+
+def run_node(config: Config) -> int:
     try:
         node = build_node(config)
     except ComponentsMissing as e:

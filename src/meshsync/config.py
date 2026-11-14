@@ -32,6 +32,7 @@ DEFAULTS: dict[str, Any] = {
     "chunking": "cdc",  # D10
     "peers": [],  # static fallback list (§14)
     "log_level": "INFO",
+    "metrics_csv": None,  # off unless set; per-message CSV for §11 (#72)
 }
 FILE_KEYS = {"sync_dir", "name", "secret_file", *DEFAULTS}
 
@@ -49,6 +50,7 @@ TYPES: dict[str, tuple[type, ...]] = {
     "chunking": (str,),
     "peers": (list,),
     "log_level": (str,),
+    "metrics_csv": PATH_TYPES,
 }
 
 
@@ -68,6 +70,7 @@ class Config:
     chunking: str = "cdc"
     peers: tuple[tuple[str, int], ...] = ()
     log_level: str = "INFO"
+    metrics_csv: Path | None = None
 
 
 def read_config_file(path: Path | None) -> dict[str, Any]:
@@ -148,6 +151,7 @@ def load_config(args: argparse.Namespace) -> Config:
         "chunking": args.chunking,
         "peers": args.peer,  # None unless --peer given at least once
         "log_level": args.log_level,
+        "metrics_csv": args.metrics_csv,
     }
     c = merge(cli, read_config_file(args.config))
     check_types(c)
@@ -198,4 +202,5 @@ def load_config(args: argparse.Namespace) -> Config:
         chunking=c["chunking"],
         peers=tuple(parse_peer(p) for p in c["peers"]),
         log_level=level,
+        metrics_csv=Path(c["metrics_csv"]).expanduser() if c["metrics_csv"] else None,
     )
