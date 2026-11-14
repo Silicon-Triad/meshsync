@@ -3,8 +3,8 @@
 Evidence that meshsync runs across three independent hosts on one LAN, discovering peers over
 UDP and syncing over TCP, in plain and TLS mode (PROJECT_CONTEXT.md §2 R3, §14 network check).
 
-Owner: Huzaifa Hanif (@Huzaifa-Hanif-01); this session was run by Mujtaba Jawaid Rao during
-Huzaifa's exams. Related issues: #67 (this session), #74 (report R3 section uses it).
+Owner: Huzaifa Hanif (@Huzaifa-Hanif-01); this session was run by Mujtaba Jawaid Rao.
+Related issues: #67 (this session), #74 (report R3 section uses it).
 Rules: [`AGENTS.md`](../../AGENTS.md).
 
 Session date: 2026-11-12. Code: `main` at `79854e6`.
@@ -19,7 +19,8 @@ Session date: 2026-11-12. Code: `main` at `79854e6`.
 
 Redactions (privacy, nothing technical changed): the Toshiba's hostname and Linux user name were
 replaced by `defalt`, and the `altname wlx<MAC>` lines were removed from `ip addr` (they hold the
-Wi-Fi MAC address).
+Wi-Fi MAC address). The first commit of PR #78 still contains those lines; squash merge keeps
+them off `main`, but they remain visible in that PR's history.
 
 ## Hosts and IP addressing plan
 
@@ -30,7 +31,7 @@ so discovery broadcasts and TCP connections stay on the LAN (§14).
 | meshsync name | Machine | OS (kernel) | Python | Interface | IPv4 | Address from | Firewall |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `kratos` | laptop | Omarchy 4.0.6 (Linux 7.2.8) | 3.14.8 | `wlp2s0` | 192.168.100.92/24 | DHCP | ufw active, default deny in; 47000/udp and 47001/tcp already allowed |
-| `minipc` | mini PC | Debian 13 trixie (Linux 6.12.113) | 3.13.5 | `wlp2s0` | 192.168.100.190/24 | static | no ufw; nftables INPUT policy accept |
+| `minipc` | mini PC | Debian 13 trixie (Linux 6.12.113) | 3.13.5 | `wlp2s0` | 192.168.100.190/24 | static | no ufw; nftables INPUT policy accept (firewall section in `host.txt` trimmed to that) |
 | `defalt` | laptop (Toshiba Tecra R950) | Ubuntu 20.04.6 LTS (Linux 5.15.0) | 3.11.18 | `wlp4s0` | 192.168.100.80/24 | DHCP | ufw inactive, no nft |
 
 Ports (from `protocol/constants.py`): UDP 47000 discovery, TCP 47001 data. One peer per host, so
@@ -55,7 +56,7 @@ on a different time zone, the seconds agree).
 
 | # | Check (§14) | Evidence | Result |
 | - | ----------- | -------- | ------ |
-| 1 | Same subnet, `ping` each pair | step-1 output (in #67 session), `host.txt` | all pairs reply, 0% loss |
+| 1 | Same subnet, `ping` each pair | `host.txt` (same /24); `data/baseline/raw/ping_*` (#70, same demo network: 5 × 10 pings per ordered pair) | all pairs reply, 0% loss |
 | 2 | UDP 47000 discovery | `peer up` in `plain.log` with no static peers (`peers=()`) | full mesh found |
 | 3 | TCP 47001 through the firewall | `handshake ok` (HMAC, D4) on all 3 links | all 3 links up |
 | 4 | Initial sync | existing files on `kratos` assembled on `minipc` and `defalt` (20:27) | ok |
