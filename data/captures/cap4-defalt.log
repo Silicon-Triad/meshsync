@@ -1,0 +1,17 @@
+2026-11-14 13:57:30,142 INFO meshsync.__main__: config: Config(sync_dir=PosixPath('/home/defalt/cap4'), name='defalt', secret_file=PosixPath('/home/defalt/.meshsync/key'), tls=False, cert_dir=None, tcp_port=47001, udp_port=47000, chunking='cdc', peers=(), log_level='INFO')
+2026-11-14 13:57:30,150 INFO meshsync.net.manager: peer manager started: defalt on tcp 47001 (plain)
+2026-11-14 13:57:30,271 INFO meshsync.net.auth: responder handshake ok with kratos (2944926D)
+2026-11-14 13:57:30,272 INFO meshsync.net.manager: peer up: kratos 192.168.100.92:0 (plain)
+2026-11-14 13:57:30,289 INFO meshsync.net.connection: connection to kratos is SYNCED
+2026-11-14 13:58:16,340 INFO meshsync.transfer.scheduler: fetching large.bin: 1403 of 1403 chunks from 1 peers
+2026-11-14 13:58:35,167 WARNING meshsync.net.discovery: drop 2944926D from 192.168.100.92: replay ts 1794664713
+2026-11-14 13:59:21,282 INFO meshsync.__main__: config: Config(sync_dir=PosixPath('/home/defalt/cap4'), name='defalt', secret_file=PosixPath('/home/defalt/.meshsync/key'), tls=False, cert_dir=None, tcp_port=47001, udp_port=47000, chunking='cdc', peers=(), log_level='INFO')
+2026-11-14 13:59:21,290 INFO meshsync.net.manager: peer manager started: defalt on tcp 47001 (plain)
+2026-11-14 13:59:21,364 INFO meshsync.net.auth: responder handshake ok with kratos (2944926D)
+2026-11-14 13:59:21,365 INFO meshsync.net.manager: peer up: kratos 192.168.100.92:0 (plain)
+2026-11-14 13:59:21,472 INFO meshsync.net.connection: connection to kratos is SYNCED
+2026-11-14 13:59:21,521 INFO meshsync.transfer.scheduler: fetching large.bin: 633 of 1403 chunks from 1 peers
+2026-11-14 13:59:54,256 INFO meshsync.transfer.scheduler: fetched all chunks of large.bin
+2026-11-14 13:59:55,178 INFO meshsync.transfer.assembler: assembled large.bin (104857600 bytes, 1403 chunks)
+2026-11-14 14:00:00,419 INFO meshsync.net.connection: closing connection to kratos: peer sent BYE: shutdown
+2026-11-14 14:00:00,419 INFO meshsync.net.manager: peer down: kratos 192.168.100.92 (plain): peer sent BYE: shutdown

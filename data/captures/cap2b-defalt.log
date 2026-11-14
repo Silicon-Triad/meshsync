@@ -1,0 +1,9 @@
+2026-11-14 13:41:33,531 INFO meshsync.__main__: config: Config(sync_dir=PosixPath('/home/defalt/cap2'), name='defalt', secret_file=PosixPath('/home/defalt/.meshsync/wrongkey'), tls=False, cert_dir=None, tcp_port=47001, udp_port=47000, chunking='cdc', peers=(('192.168.100.92', 47001),), log_level='INFO')
+2026-11-14 13:41:33,539 INFO meshsync.net.manager: peer manager started: defalt on tcp 47001 (plain)
+2026-11-14 13:41:33,557 WARNING meshsync.net.auth: initiator handshake failed: AUTH_FAILED: bad mac_r
+2026-11-14 13:41:36,811 WARNING meshsync.net.discovery: drop D5A6E688 from 192.168.100.92: bad tag
+2026-11-14 13:41:38,572 WARNING meshsync.net.auth: initiator handshake failed: AUTH_FAILED: bad mac_r
+2026-11-14 13:41:41,811 WARNING meshsync.net.discovery: drop D5A6E688 from 192.168.100.92: bad tag
+2026-11-14 13:41:43,588 WARNING meshsync.net.auth: initiator handshake failed: AUTH_FAILED: bad mac_r
+2026-11-14 13:41:46,812 WARNING meshsync.net.discovery: drop D5A6E688 from 192.168.100.92: bad tag
+2026-11-14 13:41:48,651 WARNING meshsync.net.auth: initiator handshake failed: AUTH_FAILED: bad mac_r
