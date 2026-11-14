@@ -2,7 +2,7 @@
 
 Experiment runners for the measurement plan (§11, R6).
 
-Owner: Huzaifa Hanif (@Huzaifa-Hanif-01). Related issues: #20, #69 (conditions 5-6), #70 (baseline).
+Owner: Huzaifa Hanif (@Huzaifa-Hanif-01). Related issues: #20, #68 (anon_mac), #69 (conditions 5-6), #70 (baseline).
 Rules: [`AGENTS.md`](../../AGENTS.md).
 
 ```bash
@@ -48,3 +48,5 @@ scripts/measure/run.py all --runs 5
   a failed run is logged and re-run next time. `baseline.py RAW_DIR --out data/baseline
   [--metrics NAME=CSV ...]` writes per-run CSVs, mean ± sd per pair, and the meshsync PING/PONG
   cross-check from `peer.py` metrics CSVs. Results: `data/baseline/README.md`.
+- **`anon_mac.py IN.pcapng OUT.pcapng` (#68):** replaces every unicast MAC in a pcapng capture
+  with a stable fake (`02:00:00:00:00:NN`) before it is committed; everything else is unchanged.
