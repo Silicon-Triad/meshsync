@@ -63,7 +63,7 @@ Group: G2.
 | D2   | Version vectors for conflict detection. Never compare clocks across hosts. |
 | D3   | Framing: fixed 12-byte binary header + JSON control body / raw bytes for chunk data. |
 | D4   | HMAC-SHA256 challenge–response with shared secret.           |
-| D5   | Wireshark Lua dissector = future work.                       |
+| D5   | Wireshark Lua dissector for the TCP framing (§6, `PROTOCOL.md` §4–§5) and UDP discovery (`PROTOCOL.md` §3). In scope; required for R5. |
 | D6   | Pure P2P, full mesh. No server mode.                         |
 | D7   | Deployment on 3 Linux laptops.                               |
 | D8   | Local index = JSON file, atomic write (temp + `os.replace`). |
@@ -249,6 +249,8 @@ meshsync/
 │   ├── PROTOCOL.md             # full R1 spec (grows from §6)
 │   ├── AI_USE_LOG.md
 │   └── diagrams/
+├── tools/
+│   └── wireshark/              # meshsync.lua dissector + README (#81, #82)
 ├── src/meshsync/
 │   ├── __main__.py             # CLI entry: run / status / stats
 │   ├── config.py               # CLI args + config file
@@ -427,4 +429,4 @@ Brief requires an AI-use appendix. Log in `docs/AI_USE_LOG.md`: date, member, to
 
 ## 18. Out of Scope / Future Work
 
-Wireshark Lua dissector · NAT traversal / multi-subnet · inotify · tombstone garbage collection · GUI · rename detection.
+NAT traversal / multi-subnet · inotify · tombstone garbage collection · GUI · rename detection.
