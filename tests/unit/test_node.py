@@ -1,5 +1,7 @@
 """Tests for node.py (§6.4, §6.7, §8.3). Localhost sockets, static peers, small timers."""
 
+import json
+import logging
 import re
 import socket
 import time
@@ -20,6 +22,7 @@ from fakes import (
 )
 from meshsync import __main__ as cli
 from meshsync import node as node_mod
+from meshsync import status as status_mod
 from meshsync.net import manager
 from meshsync.net.auth import PeerIdentity
 from meshsync.net.connection import Connection, RemoteError, State
@@ -27,6 +30,7 @@ from meshsync.net.manager import PeerManager
 from meshsync.node import Node, load_or_create_peer_id
 from meshsync.protocol.constants import ErrorCode, MsgType
 from meshsync.protocol.framing import send_msg
+from meshsync.status import StatusWriter
 
 KEY = bytes(range(32))
 ALICE = PeerIdentity("A1F3C9D2", "alice")  # lower id: dials
@@ -288,3 +292,92 @@ def test_on_notify_drops_malformed_body(body: object) -> None:
     side.node._on_notify(conn, 1, body)  # type: ignore[arg-type]  # must not raise
     assert side.engine.applied == [] and side.engine.fetched == []
     assert side.index.entries() == []
+
+
+# ------------------------------------------------------------ status file (#64)
+
+
+@pytest.fixture
+def no_refresh(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Only event hooks write the file during a test, not the periodic refresh.
+    monkeypatch.setattr(status_mod, "SCAN_INTERVAL", 60)
+
+
+def with_status(side: Side, sync_dir: Path, me: PeerIdentity) -> Path:
+    sync_dir.mkdir()
+    info = {"name": me.name, "peer_id": me.peer_id, "mode": "plain", "tcp_port": side.port,
+            "udp_port": 0}  # fmt: skip
+    side.node.status = StatusWriter(sync_dir, info)
+    return status_mod.status_path(sync_dir)
+
+
+def read(path: Path) -> dict:
+    return json.loads(path.read_text())
+
+
+def test_status_file_tracks_peers_and_local_changes(
+    sides: list[Side], tmp_path: Path, no_refresh: None
+) -> None:
+    b = Side(BOB)
+    a = Side(ALICE, static=[("127.0.0.1", b.port)])
+    sides += [a, b]
+    path = with_status(a, tmp_path / "a", ALICE)
+    b.node.start()
+    a.node.start()
+    assert set(read(path)) >= {
+        "name", "peer_id", "mode", "tcp_port", "udp_port", "pid", "started_at", "updated_at",
+        "index_rev", "entries", "tombstones", "peers", "stopped",
+    }  # fmt: skip
+    # peer up, then SYNCED after the index exchange
+    assert wait_until(lambda: [p["state"] for p in read(path)["peers"]] == ["SYNCED"])
+    peer = read(path)["peers"][0]
+    assert (peer["name"], peer["peer_id"], peer["tcp_port"]) == ("bob", BOB.peer_id, b.port)
+    assert peer["last_seen"] is not None
+    # local change
+    entry = a.add_file("n.txt", [b"abc"], {ALICE.peer_id: 1})
+    a.add_file("gone.txt", [], {ALICE.peer_id: 1})
+    a.index.put({**a.index.get("gone.txt"), "deleted": True})  # type: ignore[dict-item]
+    a.scanner.trigger(entry)
+    data = read(path)
+    assert (data["index_rev"], data["entries"], data["tombstones"]) == (a.index.rev, 1, 1)
+    # peer down
+    b.node.stop()
+    assert wait_until(lambda: read(path)["peers"] == [])
+    # clean stop keeps the file, marked stopped
+    a.node.stop()
+    assert read(path)["stopped"] is True
+    assert not list(path.parent.glob("*.tmp"))
+
+
+def test_status_write_failure_is_logged_and_node_runs(
+    sides: list[Side], tmp_path: Path, no_refresh: None, caplog: pytest.LogCaptureFixture
+) -> None:
+    a = Side(ALICE)
+    sides.append(a)
+    with_status(a, tmp_path / "a", ALICE)
+
+    def boom(data: dict) -> None:
+        raise OSError("disk full")
+
+    a.node.status._write = boom  # type: ignore[union-attr,method-assign]
+    with caplog.at_level(logging.WARNING, logger="meshsync.status"):
+        a.node.start()
+        entry = a.add_file("x.txt", [b"x"], {ALICE.peer_id: 1})
+        a.scanner.trigger(entry)  # must not raise
+    assert "could not write" in caplog.text
+    assert a.mgr.peers() == [] and not a.node._stopped
+    a.node.stop()  # must not raise either
+
+
+def test_exchange_failure_on_closed_link_does_not_restore_last_seen(sides: list[Side]) -> None:
+    # PR #86 review: peer_down pops _last_seen; the exchange's finally must not put it back.
+    a = Side(ALICE)
+    sides.append(a)
+
+    def request(*args: object) -> object:
+        raise ConnectionError("link closed")
+
+    conn = SimpleNamespace(request=request, mark_synced=lambda: None, state=State.CLOSED)
+    peer = SimpleNamespace(peer_id=BOB.peer_id, conn=conn)
+    a.node._exchange_index(peer)  # type: ignore[arg-type]
+    assert BOB.peer_id not in a.node._last_seen
