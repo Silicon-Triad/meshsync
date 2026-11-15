@@ -1,0 +1,61 @@
+% CS-327 CEP report, group G2 (meshsync). Skeleton: issue #73. Content: #74, #75.
+% Owner: all members. Rules: AGENTS.md; formal requirements: report/README.md.
+%
+% Builds with Tectonic / XeLaTeX / LuaLaTeX (fontspec) or pdfLaTeX (Overleaf).
+%   tectonic main.tex        or        latexmk -pdf main.tex
+%
+% Formal requirements (course brief §9-§11 and rubric):
+%   - at most 10 pages, excluding the rubric title page, references and the code appendix;
+%     the build log prints "BODY PAGES: N (limit 10)" and warns when N > 10.
+%   - Times New Roman, 12 pt body, 14 pt headings.
+%   - the filled-in grading rubric is the title page (no separate title page).
+%   - figures and tables labelled and numbered (\caption + \label).
+%
+% Packages, fonts, layout and macros: preamble.tex (style follows the team's CS-326 SRS).
+\documentclass[12pt,a4paper]{article}
+\input{preamble}
+
+\begin{document}
+
+% ---- Title page: the course's grading rubric (no separate title page) -----------------
+% Put the filled-in rubric at report/rubric.pdf (gitignored: we attach it ourselves).
+\pagenumbering{gobble}
+\IfFileExists{rubric.pdf}{%
+  \includepdf[pages=-]{rubric.pdf}%
+}{%
+  \input{sections/00-rubric-placeholder}%
+}
+
+% ---- Body: counted against the 10-page limit ------------------------------------------
+\clearpage
+\pagenumbering{arabic}
+
+\input{sections/01-introduction}
+\input{sections/02-protocol}
+\input{sections/03-architecture}
+\input{sections/04-implementation}
+\input{sections/05-capture}
+\input{sections/06-performance}
+\input{sections/07-tensions}
+\input{sections/08-sustainability}
+\input{sections/09-failure}
+\input{sections/10-contributions}
+
+% End of the counted body: report the page count in the build log.
+\label{body-end}
+\typeout{BODY PAGES: \getpagerefnumber{body-end} (limit 10)}
+\ifnum\getpagerefnumber{body-end}>10
+  \GenericWarning{}{report: body is \getpagerefnumber{body-end} pages, over the 10-page limit}
+\fi
+
+% ---- Not counted: references and appendices -------------------------------------------
+\clearpage
+\input{sections/11-references}
+
+\appendix
+\clearpage
+\input{appendices/code}
+\clearpage
+\input{appendices/ai-use}
+
+\end{document}
