@@ -44,6 +44,7 @@ sync, version vectors, HMAC auth, TLS 1.3). Python 3.11+, standard library only 
 | `tests/unit/`, `tests/integration/` | owner of the code under test | — |
 | `scripts/` (gen_certs, run_local_mesh) | Muhammad Ahmed Qazi | #7  |
 | `scripts/` (netem, gen_testdata), `scripts/measure/` | Huzaifa Hanif | #18–#20 |
+| `tools/wireshark/`           | Muhammad Ahmed Qazi   | #81, #82     |
 | `docs/`                      | all (PROTOCOL.md: Ahmed) | #8        |
 | `analysis/`, `data/`         | Huzaifa Hanif         | #20          |
 | `report/`                    | all                   | —            |
