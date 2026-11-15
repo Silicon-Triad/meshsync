@@ -24,19 +24,32 @@
   \usepackage[T1]{fontenc}
   \usepackage{newtxtext,newtxmath}
 \else
-  % XeTeX (Tectonic) / LuaTeX: real Times New Roman if installed, else TeX Gyre Termes
-  % (a Times clone shipped with TeX distributions and the Tectonic bundle).
+  % XeTeX (Tectonic) / LuaTeX. Fonts are loaded by FILE NAME only: a lookup by font name
+  % (e.g. \IfFontExistsTF{Times New Roman}) makes Tectonic scan every system font through
+  % fontconfig, and one malformed system font crashes it (Tectonic panic in fc.rs).
   \usepackage{fontspec}
-  \IfFontExistsTF{Times New Roman}{%
-    \setmainfont{Times New Roman}%
-  }{%
+  % Real Times New Roman: install the font files (Arch: ttf-ms-fonts, which puts
+  % times.ttf, timesbd.ttf, timesi.ttf, timesbi.ttf in /usr/share/fonts/TTF/), then set
+  % \realtimestrue below. Default: TeX Gyre Termes, a Times clone in the Tectonic bundle.
+  \newif\ifrealtimes
+  \realtimesfalse
+  \newcommand{\timesfontpath}{/usr/share/fonts/TTF/}
+  \ifrealtimes
+    \setmainfont{times}[
+      Path = \timesfontpath,
+      Extension = .ttf,
+      UprightFont = *,
+      BoldFont = *bd,
+      ItalicFont = *i,
+      BoldItalicFont = *bi]
+  \else
     \setmainfont{texgyretermes}[
       Extension = .otf,
       UprightFont = *-regular,
       BoldFont = *-bold,
       ItalicFont = *-italic,
-      BoldItalicFont = *-bolditalic]%
-  }
+      BoldItalicFont = *-bolditalic]
+  \fi
 \fi
 
 % ---- Headings: 14 pt ------------------------------------------------------------------

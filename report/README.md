@@ -41,8 +41,11 @@ and its suggested page budget. Unfilled content is marked `\TODO{...}` and shows
 
 How `main.tex` enforces them:
 
-- **Fonts:** with Tectonic/XeLaTeX/LuaLaTeX, `fontspec` uses Times New Roman if it is installed,
-  else TeX Gyre Termes (a Times clone). With pdfLaTeX (Overleaf), `newtxtext` (a Times clone).
+- **Fonts:** with Tectonic/XeLaTeX/LuaLaTeX, `fontspec` loads TeX Gyre Termes (a Times clone)
+  by file name. For real Times New Roman, install the font files (Arch: `ttf-ms-fonts`) and set
+  `\realtimestrue` in `main.tex` (`\timesfontpath` gives their folder). Fonts are never looked
+  up by name: that makes Tectonic scan all system fonts, and one bad font crashes it.
+  With pdfLaTeX (Overleaf), `newtxtext` (a Times clone).
   `12pt` class option for the body; `titlesec` sets section headings to 14 pt; subsections
   stay 12 pt bold.
 - **Page limit:** the rubric pages are unnumbered; numbering starts at 1 on the Introduction.
