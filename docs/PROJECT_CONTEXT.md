@@ -63,7 +63,7 @@ Group: G2.
 | D2   | Version vectors for conflict detection. Never compare clocks across hosts. |
 | D3   | Framing: fixed 12-byte binary header + JSON control body / raw bytes for chunk data. |
 | D4   | HMAC-SHA256 challenge–response with shared secret.           |
-| D5   | Wireshark Lua dissector for the TCP framing (§6) and UDP discovery: in scope, required for R5 (#81). |
+| D5   | Wireshark Lua dissector for the TCP framing (§6, `PROTOCOL.md` §4–§5) and UDP discovery (`PROTOCOL.md` §3). In scope; required for R5. |
 | D6   | Pure P2P, full mesh. No server mode.                         |
 | D7   | Deployment on 3 Linux laptops.                               |
 | D8   | Local index = JSON file, atomic write (temp + `os.replace`). |
