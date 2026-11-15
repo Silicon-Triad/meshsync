@@ -28,7 +28,7 @@ from typing import Any, Literal, Protocol
 from meshsync.config import Config
 from meshsync.net import auth, tls
 from meshsync.net.auth import PeerIdentity
-from meshsync.net.connection import Connection
+from meshsync.net.connection import Connection, State
 from meshsync.net.manager import PeerInfo, PeerManager
 from meshsync.protocol.constants import HANDSHAKE_TIMEOUT, META_DIR, ErrorCode, MsgType
 from meshsync.status import StatusWriter
@@ -282,7 +282,8 @@ class Node:
             log.warning("index exchange with %s failed", peer.peer_id, exc_info=True)
         finally:
             peer.conn.mark_synced()  # no-op unless the link is still AUTHENTICATED
-            self._last_seen[peer.peer_id] = time.time()
+            if peer.conn.state is not State.CLOSED:  # peer_down already dropped it (PR #86)
+                self._last_seen[peer.peer_id] = time.time()
             self._status_changed()
 
     def _on_peer_down(self, peer: PeerInfo, reason: str) -> None:

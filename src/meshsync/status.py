@@ -46,8 +46,10 @@ class StatusWriter:
     """Writes status.json. `info` holds the fixed fields (name, peer_id, mode, ports, ...);
     `snapshot()` returns the live ones (index_rev, entries, tombstones, peers).
 
-    Never raises: a failed write is logged as WARNING and the node carries on (R-4.6). Writes
-    take no lock (R-4.7): each uses its own temp file, and os.replace makes the last one win.
+    Never raises: a failed write is logged as WARNING and the node carries on (R-4.6). Each
+    write uses its own temp file and fsyncs it without a lock (R-4.7); only the stopped check
+    and os.replace run under _replace_lock, together with stop() setting the flag, so an
+    update already in progress can never overwrite the stopped file (PR #86 review).
     """
 
     def __init__(self, sync_dir: Path, info: dict[str, Any]) -> None:
@@ -55,6 +57,7 @@ class StatusWriter:
         self.info = dict(info, pid=os.getpid(), started_at=time.time())
         self._snapshot: Callable[[], dict[str, Any]] | None = None
         self._stop = threading.Event()
+        self._replace_lock = threading.Lock()
         self._thread: threading.Thread | None = None
 
     def start(self, snapshot: Callable[[], dict[str, Any]]) -> None:
@@ -73,9 +76,10 @@ class StatusWriter:
 
     def stop(self) -> None:
         """Mark the file stopped (kept, so `status` can show the last known state)."""
-        if self._stop.is_set():
-            return
-        self._stop.set()
+        with self._replace_lock:
+            if self._stop.is_set():
+                return
+            self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=SCAN_INTERVAL)
         try:
@@ -105,9 +109,10 @@ class StatusWriter:
                 f.write(text)
                 f.flush()
                 os.fsync(f.fileno())
-            if self._stop.is_set() and not data["stopped"]:
-                return  # stop() ran meanwhile: don't overwrite the stopped state
-            os.replace(tmp, self.path)
+            with self._replace_lock:
+                if self._stop.is_set() and not data["stopped"]:
+                    return  # stop() ran meanwhile: don't overwrite the stopped state
+                os.replace(tmp, self.path)
         finally:
             if os.path.exists(tmp):
                 os.unlink(tmp)

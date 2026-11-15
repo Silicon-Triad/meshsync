@@ -367,3 +367,17 @@ def test_status_write_failure_is_logged_and_node_runs(
     assert "could not write" in caplog.text
     assert a.mgr.peers() == [] and not a.node._stopped
     a.node.stop()  # must not raise either
+
+
+def test_exchange_failure_on_closed_link_does_not_restore_last_seen(sides: list[Side]) -> None:
+    # PR #86 review: peer_down pops _last_seen; the exchange's finally must not put it back.
+    a = Side(ALICE)
+    sides.append(a)
+
+    def request(*args: object) -> object:
+        raise ConnectionError("link closed")
+
+    conn = SimpleNamespace(request=request, mark_synced=lambda: None, state=State.CLOSED)
+    peer = SimpleNamespace(peer_id=BOB.peer_id, conn=conn)
+    a.node._exchange_index(peer)  # type: ignore[arg-type]
+    assert BOB.peer_id not in a.node._last_seen

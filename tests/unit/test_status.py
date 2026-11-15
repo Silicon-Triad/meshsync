@@ -1,11 +1,14 @@
 """Tests for status.py and the `meshsync status` / `stats` commands (#64, §14)."""
 
 import json
+import os
+import threading
 import time
 from pathlib import Path
 
 import pytest
 
+from meshsync import status as status_mod
 from meshsync.__main__ import main
 from meshsync.metrics.logger import CSV_HEADER
 from meshsync.status import (
@@ -160,3 +163,33 @@ def test_stats_unset_or_missing(tmp_path: Path, capsys: pytest.CaptureFixture) -
     assert "not found" in capsys.readouterr().err
     (tmp_path / "wrong.csv").write_text("a,b\n")
     assert main(["stats", "--metrics-csv", str(tmp_path / "wrong.csv")]) == 1
+
+
+def test_update_in_progress_cannot_overwrite_stopped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # PR #86 review: an update() that passed the stopped check must not os.replace its
+    # "stopped": false file after stop() has written "stopped": true.
+    monkeypatch.setattr(status_mod, "SCAN_INTERVAL", 60)  # no periodic refresh in this test
+    w = StatusWriter(tmp_path, {})
+    w.start(lambda: {"peers": []})
+    real_replace = os.replace
+    in_replace, release = threading.Event(), threading.Event()
+
+    def slow_replace(src: str, dst: object) -> None:
+        if threading.current_thread().name == "updater":
+            in_replace.set()
+            release.wait(5)
+        real_replace(src, dst)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(status_mod.os, "replace", slow_replace)
+    updater = threading.Thread(target=w.update, name="updater")
+    updater.start()
+    assert in_replace.wait(5)  # the update is past the stopped check
+    stopper = threading.Thread(target=w.stop, name="stopper")
+    stopper.start()
+    stopper.join(1.0)  # without the lock stop() finishes here; with it, it waits
+    release.set()
+    updater.join(5)
+    stopper.join(5)
+    assert json.loads(status_path(tmp_path).read_text())["stopped"] is True
