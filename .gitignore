@@ -30,3 +30,16 @@ testdata/
 
 # analysis output (#71); committed only once real data exists
 analysis/out/
+
+# report build outputs (#73); the filled-in rubric is attached by hand, never committed
+report/*.pdf
+report/**/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.bbl
+report/*.blg
+report/*.fls
+report/*.fdb_latexmk
+report/*.synctex.gz
+report/*.xdv
