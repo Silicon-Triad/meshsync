@@ -126,7 +126,8 @@ def test_main_exit_codes(env, monkeypatch):
     monkeypatch.setattr(cli, "build_node", missing)
     assert main(args_for(env)) == 1
     assert main(args_for(env, "--name", "BAD")) == 2
-    assert main(["status"]) == 1
+    # no --dir and no sync_dir in the config: config error (#64)
+    assert main(["status", "--config", str(env["cfg"])]) == 2
 
 
 @pytest.mark.parametrize(
