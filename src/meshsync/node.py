@@ -11,6 +11,7 @@ Flow:
   NOTIFY         -> the entry goes to the engine
   engine "fetch" -> scheduler.fetch(entry, peers), then engine.on_fetched(entry)
   scanner change -> NOTIFY {entry} to every peer
+  status         -> <sync_dir>/.meshsync/status.json refreshed on these events (#64)
 Handlers run on connection reader threads, so they only reply or hand work to a thread pool.
 """
 
@@ -18,6 +19,7 @@ import logging
 import re
 import secrets
 import threading
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -26,9 +28,10 @@ from typing import Any, Literal, Protocol
 from meshsync.config import Config
 from meshsync.net import auth, tls
 from meshsync.net.auth import PeerIdentity
-from meshsync.net.connection import Connection
+from meshsync.net.connection import Connection, State
 from meshsync.net.manager import PeerInfo, PeerManager
 from meshsync.protocol.constants import HANDSHAKE_TIMEOUT, META_DIR, ErrorCode, MsgType
+from meshsync.status import StatusWriter
 
 log = logging.getLogger(__name__)
 
@@ -132,6 +135,7 @@ class Node:
         scheduler: SchedulerLike,
         scanner: ScannerLike,
         manager: PeerManager | None = None,
+        status: StatusWriter | None = None,
     ) -> None:
         self.config = config
         self.index = index
@@ -144,6 +148,8 @@ class Node:
         self._lock = threading.Lock()
         self._started = False
         self._stopped = False
+        self.status = status
+        self._last_seen: dict[str, float] = {}  # peer_id -> time.time() of last message (#64)
 
     def _build_manager(self) -> PeerManager:
         cfg = self.config
@@ -176,8 +182,11 @@ class Node:
         mgr.register_handler(MsgType.NOTIFY, self._on_notify)
         mgr.register_handler(MsgType.CHUNK_REQ, self._on_chunk_req)
         mgr.on("peer_up", self._on_peer_up)
+        mgr.on("peer_down", self._on_peer_down)
         mgr.start()
         self.scanner.start(self._on_local_change)
+        if self.status is not None:
+            self.status.start(self._status_snapshot)
 
     def stop(self) -> None:
         with self._lock:
@@ -187,6 +196,36 @@ class Node:
         self.scanner.stop()
         self.manager.stop()
         self._pool.shutdown(wait=False, cancel_futures=True)
+        if self.status is not None:
+            self.status.stop()
+
+    # ------------------------------------------------------------ status file (#64, §14)
+
+    def _status_snapshot(self) -> dict:
+        entries = self.index.entries()
+        tombstones = sum(1 for e in entries if e.get("deleted"))
+        last_seen = dict(self._last_seen)
+        peers = [
+            {
+                "name": p.name,
+                "peer_id": p.peer_id,
+                "addr": p.addr,
+                "tcp_port": p.tcp_port,
+                "state": p.conn.state.name,
+                "last_seen": last_seen.get(p.peer_id),
+            }
+            for p in self.manager.peers()
+        ]
+        return {
+            "index_rev": self.index.rev,
+            "entries": len(entries) - tombstones,
+            "tombstones": tombstones,
+            "peers": peers,
+        }
+
+    def _status_changed(self) -> None:
+        if self.status is not None:
+            self.status.update()  # never raises
 
     # ------------------------------------------------------------ handlers (reader threads)
 
@@ -203,7 +242,9 @@ class Node:
         if not isinstance(entry, dict):
             log.warning("dropping malformed NOTIFY from %s", conn.remote.peer_id)
             return
+        self._last_seen[conn.remote.peer_id] = time.time()
         self._handle_remote(conn.remote.peer_id, entry)
+        self._status_changed()
 
     def _on_chunk_req(self, conn: Connection, req_id: int, body: Any) -> None:
         try:
@@ -220,6 +261,8 @@ class Node:
     # ------------------------------------------------------------ peer_up, remote entries
 
     def _on_peer_up(self, peer: PeerInfo) -> None:
+        self._last_seen[peer.peer_id] = time.time()
+        self._status_changed()
         # Runs on a reader/dialer thread: do the request/wait on a worker thread (§9.1).
         threading.Thread(
             target=self._exchange_index, args=(peer,), name=f"index-{peer.peer_id}", daemon=True
@@ -239,6 +282,13 @@ class Node:
             log.warning("index exchange with %s failed", peer.peer_id, exc_info=True)
         finally:
             peer.conn.mark_synced()  # no-op unless the link is still AUTHENTICATED
+            if peer.conn.state is not State.CLOSED:  # peer_down already dropped it (PR #86)
+                self._last_seen[peer.peer_id] = time.time()
+            self._status_changed()
+
+    def _on_peer_down(self, peer: PeerInfo, reason: str) -> None:
+        self._last_seen.pop(peer.peer_id, None)
+        self._status_changed()
 
     def _handle_remote(self, peer_id: str, entry: dict) -> None:
         if self._stopped:
@@ -285,6 +335,7 @@ class Node:
                 peer.conn.send(MsgType.NOTIFY, {"entry": entry})
             except Exception:  # noqa: BLE001
                 log.warning("NOTIFY to %s failed", peer.peer_id, exc_info=True)
+        self._status_changed()
 
 
 class ComponentsMissing(Exception):
@@ -307,8 +358,24 @@ def build_node(config: Config) -> Node:
         scanner = Scanner(config, index)
     except (ImportError, NotImplementedError) as e:
         raise ComponentsMissing(str(e)) from e
+    status = StatusWriter(
+        config.sync_dir,
+        {
+            "name": config.name,
+            "peer_id": load_or_create_peer_id(config.sync_dir),
+            "mode": "tls" if config.tls else "plain",
+            "tcp_port": config.tcp_port,
+            "udp_port": config.udp_port,
+        },
+    )
     node = Node(
-        config, index=index, store=store, engine=engine, scheduler=scheduler, scanner=scanner
+        config,
+        index=index,
+        store=store,
+        engine=engine,
+        scheduler=scheduler,
+        scanner=scanner,
+        status=status,
     )
     engine.on_change = node._on_local_change  # issue #14 point 3: resolved conflicts -> NOTIFY
     engine.lock = scanner.lock = threading.RLock()  # #14: one lock for engine and scanner

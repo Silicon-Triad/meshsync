@@ -12,9 +12,13 @@ authentication and a TLS 1.3 mode.
 ```bash
 python -m venv .venv && . .venv/bin/activate && pip install -e .[dev]
 meshsync run --dir ~/MeshSync --name ahmed --secret-file ~/.meshsync/key --tls --cert-dir ~/.meshsync/certs
-meshsync status
-meshsync stats
+meshsync status --dir ~/MeshSync            # peers and sync state; exit 1 if not running
+meshsync stats --metrics-csv run.csv        # totals from `run --metrics-csv run.csv`
 ```
+
+`status` reads `<dir>/.meshsync/status.json`, which the running node refreshes every scan
+interval; a file older than five scan intervals is reported as "not running". Both commands
+also take `--config FILE` and fall back to its `sync_dir` / `metrics_csv` keys.
 
 ### Local testing
 

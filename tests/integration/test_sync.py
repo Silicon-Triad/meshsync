@@ -6,6 +6,7 @@ import pytest
 from mesh import Mesh, settle, sha256
 
 from meshsync.protocol.constants import CDC_MAX, HEADER_SIZE
+from meshsync.status import status_report
 
 pytestmark = [pytest.mark.integration, pytest.mark.slow]
 
@@ -154,3 +155,20 @@ def test_concurrent_edit_makes_conflict_copy(make_mesh) -> None:
     mesh.wait(resolved, "both versions on every peer")
     copy = (mesh["a"].files() - {"notes.txt"}).pop()
     assert copy.startswith("notes.conflict-") and copy.endswith(".txt"), copy
+
+
+def test_status_reports_peers_synced(make_mesh) -> None:
+    # #64, §14: `meshsync status` on a running 2-node mesh lists the other peer as SYNCED.
+    mesh = make_mesh(["a", "b"])
+    mesh.start()
+    a, b = mesh["a"], mesh["b"]
+
+    def synced(me, other) -> bool:  # noqa: ANN001
+        code, text = status_report(me.dir)
+        return code == 0 and any(other.name in ln and "SYNCED" in ln for ln in text.splitlines())
+
+    mesh.wait(lambda: synced(a, b) and synced(b, a), "both peers SYNCED in status")
+    # The harness stops with SIGTERM, which `run` does not catch, so the file is not marked
+    # stopped; status must report "not running" once it is older than STATUS_STALE_AFTER.
+    a.stop()
+    mesh.wait(lambda: status_report(a.dir)[1].startswith("not running"), "a reported down")
