@@ -1,3 +1,4 @@
+% !TEX root = ../main.tex
 % AI-use declaration: not counted in the page limit (PROJECT_CONTEXT.md §16).
 % Generated from docs/AI_USE_LOG.md, one row per log row; cells are copied as logged.
 % Empty or placeholder cells in the log are shown as TODO: fix them in the log, then update
@@ -5,29 +6,29 @@
 \section{AI-use declaration}
 \label{app:ai-use}
 
-All AI assistance used in this project is listed below, from \texttt{docs/AI\_USE\_LOG.md}.
+All AI assistance used in this project is listed below, from \code{docs/AI\_USE\_LOG.md}.
 Every member reviewed and can explain AI-assisted work before it was merged.
 
-
-\begin{longtable}{@{}>{\raggedright\arraybackslash}p{1.7cm}>{\raggedright\arraybackslash}p{2.2cm}>{\raggedright\arraybackslash}p{2.4cm}>{\raggedright\arraybackslash}p{4.6cm}>{\raggedright\arraybackslash}p{3.8cm}@{}}
-  \caption{AI use: tool, model, purpose and outcome.}\label{tab:ai-use}\\
-  \toprule
-  Date & Member & Tool (model) & Used for & Kept / changed \\
-  \midrule
-  \endfirsthead
-  \toprule
-  Date & Member & Tool (model) & Used for & Kept / changed \\
-  \midrule
-  \endhead
-  \bottomrule
-  \endfoot
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.12\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.15\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.16\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.32\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.25\linewidth-2\tabcolsep\relax}}
+\caption{AI use: tool, model, purpose and outcome.}\label{tab:ai-use}\\
+\toprule
+\colhead{Date} & \colhead{Member} & \colhead{Tool (model)} & \colhead{Used for} & \colhead{Kept / changed} \\
+\midrule
+\endfirsthead
+\multicolumn{5}{@{}l}{\tablecontinued}\\
+\toprule
+\colhead{Date} & \colhead{Member} & \colhead{Tool (model)} & \colhead{Used for} & \colhead{Kept / changed} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
   2026-11-02 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & Repository scaffold from the scaffold brief: pyproject, CI, PR template, PROTOCOL.md, constants.py, framing.py + unit tests, module stubs, CLI skeleton, gen\_certs.sh & Kept as generated; to be reviewed line by line by another member before merge (PR \#27) \\
   2026-11-02 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & GitHub setup guide (docs/setup/github.md), CODEOWNERS, CONTRIBUTING.md from the team settings brief & Kept as generated; to be reviewed by another member before merge (PR \#28) \\
   2026-11-02 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & AGENTS.md rulebook, CLAUDE.md, folder READMEs, FROZEN INTERFACE headers, scripts/check.sh, CONTRIBUTING.md, PR template (\#29) & Draft reviewed and adjusted by Ahmed (branch names, PR size rule); to be reviewed by another member before merge \\
   2026-11-07 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & TLS contexts (\#5): net/tls.py, tests/unit/test\_tls.py, PROTOCOL.md §6, README & \TODO{outcome missing in log} \\
   2026-11-07 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & messages.py scaffold + tests (\#31) & Reviewed messages.py and tests line by line; decided review round 1 (decision label (c), tombstone shape (f), kept branch name); fixes from Mujtaba's review (RecursionError, path control chars, allow\_nan, hex case (d)) applied via Claude \\
   2026-11-07 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & CLI + config (\#6): config.py, \_\_main\_\_.py, tests/unit/test\_config.py, README config example & \TODO{outcome missing in log} \\
-  2026-11-07 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & UDP discovery (\#1): net/discovery.py, tests/unit/test\_discovery.py, PROTOCOL.md §2 drop rules & \TODO{outcome missing in log} \\
+  2026-11-07 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & UDP discovery (\#1): net/discovery.py, tests/unit/test\_discovery.py, PROTOCOL.md §2 drop rules & \TODO{outcome is a placeholder in log} \\
   2026-11-07 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & HMAC handshake (net/auth.py, tests, PROTOCOL.md decision g) (\#4) & \TODO{outcome missing in log} \\
   2026-11-07 & Muhammad Ahmed Qazi & Claude Code (Sonnet 5.5) & Connection (\#2): net/connection.py, tests/unit/test\_connection.py, tests/conftest.py (shared cert fixtures), PeerIdentity dedupe, PROTOCOL.md §3/§6/§7 + decisions (h), (i) & \TODO{outcome missing in log} \\
   2026-11-07 & Muhammad Ahmed Qazi & Claude Code (Sonnet 5.5) & PeerManager (\#3): net/manager.py, tests/unit/test\_manager.py, PROTOCOL.md §8a + decision (j) & \TODO{outcome missing in log} \\
@@ -58,4 +59,4 @@ Every member reviewed and can explain AI-assisted work before it was merged.
   2026-11-14 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & captures (\#68): scripts/measure/anon\_mac.py + tests, step-by-step capture commands, tshark analysis of the captures, data/captures/README.md (annotated packets, overhead, R7 evidence) & \TODO{outcome missing in log} \\
   2026-11-14 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & \texttt{meshsync run --metrics-csv PATH} / \texttt{metrics\_csv} key (\#72): \_\_main\_\_.py, config.py, tests/unit/test\_config.py, README config section & Kept; design decided by Ahmed on \#72, plan approved before code; pending review by Mujtaba \\
   2026-11-15 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & report skeleton (\#73): report/main.tex, report/sections/, report/appendices/ (AI-use table generated from this log), report/README.md (format rules, page budget, build, submission checklist), .gitignore & Format (LaTeX) and plan decided by Ahmed before code; to be checked by Ahmed in Tectonic before the PR; pending review by Mujtaba \\
-\end{longtable}
+\end{reptable}

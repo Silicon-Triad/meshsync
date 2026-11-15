@@ -11,7 +11,8 @@ Rules: [`AGENTS.md`](../AGENTS.md).
 
 | Path | Content |
 | ---- | ------- |
-| `main.tex` | Preamble (fonts, headings), rubric title page, section order, page-count check |
+| `main.tex` | Rubric title page, section order, page-count check |
+| `preamble.tex` | Fonts, layout, headings, header/footer, links and macros (style of our CS-326 SRS) |
 | `sections/00-rubric-placeholder.tex` | Shown only while `rubric.pdf` is missing |
 | `sections/01-…10-*.tex` | One file per counted section, in the order the brief requires |
 | `sections/11-references.tex` | References (not counted) |
@@ -39,7 +40,7 @@ and its suggested page budget. Unfilled content is marked `\TODO{...}` and shows
   each host's configuration (placeholders marked "filled by #74").
 - Figures and tables are labelled and numbered (`\caption` + `\label`).
 
-How `main.tex` enforces them:
+How `main.tex` and `preamble.tex` enforce them:
 
 - **Fonts:** with Tectonic/XeLaTeX/LuaLaTeX, `fontspec` loads TeX Gyre Termes (a Times clone)
   by file name. For real Times New Roman, install the font files (Arch: `ttf-ms-fonts`) and set
@@ -51,7 +52,7 @@ How `main.tex` enforces them:
 - **Page limit:** the rubric pages are unnumbered; numbering starts at 1 on the Introduction.
   After section 10 the build log prints `BODY PAGES: N (limit 10)` and warns if N > 10.
   References and appendices start on a new page after that point.
-- **Not set by the brief text we have:** paper size (A4) and margins (2.5 cm) are assumptions;
+- **Not set by the brief text we have:** paper size (A4) and margins (1 in, as in the SRS) are assumptions;
   confirm against the brief before submission.
 
 ## Page budget (suggestion only)
@@ -92,8 +93,28 @@ Then check the page count in the log:
 grep "BODY PAGES" report/main.log
 ```
 
-Packages used (all in TeX Live and the Tectonic bundle): geometry, iftex, fontspec or newtx,
-titlesec, graphicx, booktabs, tabularx, longtable, array, xcolor, pdfpages, refcount, hyperref.
+Packages used (all in TeX Live and the Tectonic bundle): iftex, fontspec or newtx, geometry,
+array, booktabs, longtable, tabularx, graphicx, pdfpages, xcolor, refcount, caption, titlesec,
+fancyhdr, url, hyperref.
+
+## Style and macros (`preamble.tex`)
+
+Same look as our CS-326 SRS: 1 in margins, no paragraph indent with a small gap between
+paragraphs, bold caption labels, a grey running header (`meshsync -- CS-327 CEP report` /
+`Group G2`), coloured links. Differences from the SRS, because the brief fixes them: Times
+New Roman instead of Latin Modern, 12 pt body instead of 11 pt, 14 pt section headings,
+body-size captions and tables, and no table of contents or lists of figures/tables (they would
+use pages from the 10-page budget).
+
+| Macro | Use |
+| ----- | --- |
+| `\begin{reptable}[size]{cols} … \end{reptable}` | Numbered table that breaks across pages with a repeated header (the SRS `srstable`) |
+| `\repfigure{file}{caption}{label}{maxheight}` | Numbered figure, shrunk to fit, never enlarged |
+| `\placeholderfigure{todo}{caption}{label}` | Boxed slot until the real figure exists |
+| `\code{…}` | Code, paths, message types |
+| `\refentry{n}{text}`, `\refcite{n}` | IEEE reference list and citations, no BibTeX run |
+| `\TODO{…}` | Red marker for anything not filled in yet |
+| `repnote` environment | Indented italic note |
 Build outputs (PDF, aux, log, …) are gitignored; never commit them.
 
 ## Updating the AI-use appendix

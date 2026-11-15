@@ -1,3 +1,4 @@
+% !TEX root = ../main.tex
 % Section 3. Suggested page budget: 1.5 pages (suggestion only).
 % Filled by: #74 (R3). Sources: docs/diagrams/ (network diagram), data/deploy/README.md
 % (3-host deployment session, #67: addresses and host configuration).
@@ -6,35 +7,36 @@
 
 \TODO{filled by \#74: system architecture and the 3-host deployment.}
 
-\begin{figure}[htbp]
-  \centering
-  \placeholderbox{filled by \#74: network diagram (docs/diagrams/)}
-  \caption{Network diagram of the three-host deployment.}
-  \label{fig:network}
-\end{figure}
+\placeholderfigure{filled by \#74: network diagram (docs/diagrams/)}{Network diagram of the three-host deployment.}{fig:network}
 
-\begin{table}[htbp]
-  \centering
-  \caption{IP addressing plan.}
-  \label{tab:ip-plan}
-  \begin{tabular}{lll}
-    \toprule
-    Host & Interface & IP address / prefix \\
-    \midrule
-    \multicolumn{3}{c}{\TODO{filled by \#74 (data/deploy/README.md)}} \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.3\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.3\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.4\linewidth-2\tabcolsep\relax}}
+\caption{IP addressing plan.}\label{tab:ip-plan}\\
+\toprule
+\colhead{Host} & \colhead{Interface} & \colhead{IP address / prefix} \\
+\midrule
+\endfirsthead
+\multicolumn{3}{@{}l}{\tablecontinued}\\
+\toprule
+\colhead{Host} & \colhead{Interface} & \colhead{IP address / prefix} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\multicolumn{3}{@{}l}{\TODO{filled by \#74 (data/deploy/README.md)}} \\
+\end{reptable}
 
-\begin{table}[htbp]
-  \centering
-  \caption{Configuration of each host.}
-  \label{tab:host-config}
-  \begin{tabular}{ll}
-    \toprule
-    Host & Configuration \\
-    \midrule
-    \multicolumn{2}{c}{\TODO{filled by \#74 (data/deploy/README.md)}} \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.25\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.75\linewidth-2\tabcolsep\relax}}
+\caption{Configuration of each host.}\label{tab:host-config}\\
+\toprule
+\colhead{Host} & \colhead{Configuration} \\
+\midrule
+\endfirsthead
+\multicolumn{2}{@{}l}{\tablecontinued}\\
+\toprule
+\colhead{Host} & \colhead{Configuration} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\multicolumn{2}{@{}l}{\TODO{filled by \#74 (data/deploy/README.md)}} \\
+\end{reptable}

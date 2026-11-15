@@ -11,72 +11,9 @@
 %   - the filled-in grading rubric is the title page (no separate title page).
 %   - figures and tables labelled and numbered (\caption + \label).
 %
-% Paper size and margins are NOT set by the brief as far as the issue says; A4 and 2.5 cm are
-% assumptions (TODO: confirm against the brief before submission).
+% Packages, fonts, layout and macros: preamble.tex (style follows the team's CS-326 SRS).
 \documentclass[12pt,a4paper]{article}
-
-\usepackage[margin=2.5cm]{geometry}
-\usepackage{iftex}
-
-% ---- Fonts: Times New Roman 12 pt body -------------------------------------------------
-\ifPDFTeX
-  % pdfLaTeX (Overleaf): newtx is a Times clone.
-  \usepackage[T1]{fontenc}
-  \usepackage{newtxtext,newtxmath}
-\else
-  % XeTeX (Tectonic) / LuaTeX. Fonts are loaded by FILE NAME only: a lookup by font name
-  % (e.g. \IfFontExistsTF{Times New Roman}) makes Tectonic scan every system font through
-  % fontconfig, and one malformed system font crashes it (Tectonic panic in fc.rs).
-  \usepackage{fontspec}
-  % Real Times New Roman: install the font files (Arch: ttf-ms-fonts, which puts
-  % times.ttf, timesbd.ttf, timesi.ttf, timesbi.ttf in /usr/share/fonts/TTF/), then set
-  % \realtimestrue below. Default: TeX Gyre Termes, a Times clone in the Tectonic bundle.
-  \newif\ifrealtimes
-  \realtimesfalse
-  \newcommand{\timesfontpath}{/usr/share/fonts/TTF/}
-  \ifrealtimes
-    \setmainfont{times}[
-      Path = \timesfontpath,
-      Extension = .ttf,
-      UprightFont = *,
-      BoldFont = *bd,
-      ItalicFont = *i,
-      BoldItalicFont = *bi]
-  \else
-    \setmainfont{texgyretermes}[
-      Extension = .otf,
-      UprightFont = *-regular,
-      BoldFont = *-bold,
-      ItalicFont = *-italic,
-      BoldItalicFont = *-bolditalic]
-  \fi
-\fi
-
-% ---- Headings: 14 pt ------------------------------------------------------------------
-\usepackage{titlesec}
-\titleformat{\section}{\fontsize{14}{17}\selectfont\bfseries}{\thesection}{1em}{}
-% Subsections stay at body size (12 pt bold), below the 14 pt heading size.
-\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
-
-% ---- Tables, figures, misc ------------------------------------------------------------
-\usepackage{graphicx}
-\usepackage{booktabs}
-\usepackage{tabularx}
-\usepackage{longtable}
-\usepackage{array}
-\usepackage{xcolor}
-\usepackage{pdfpages}
-\usepackage{refcount}
-\usepackage[hidelinks]{hyperref}
-
-\graphicspath{{figures/}{../docs/diagrams/}{../analysis/out/}}
-
-% Visible marker for anything not filled in yet. Search the PDF for "TODO" before submitting.
-\newcommand{\TODO}[1]{\textcolor{red}{\textbf{TODO:} #1}}
-
-% Boxed placeholder for a figure that #74/#75 will replace with \includegraphics.
-\newcommand{\placeholderbox}[1]{%
-  \fbox{\parbox[c][4cm][c]{0.9\linewidth}{\centering\TODO{#1}}}}
+\input{preamble}
 
 \begin{document}
 
