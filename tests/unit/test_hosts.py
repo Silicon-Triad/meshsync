@@ -90,3 +90,16 @@ def test_cli_rejects_bad_hosts(tmp_path: Path) -> None:
     for hosts in (["a:1"], ["a:1", "a:2"], ["a:1", "bad"]):
         with pytest.raises(SystemExit):
             hs.main(["full_delta", *hosts, "--testdata", str(tmp_path), "--data", str(tmp_path)])
+
+
+def test_fetch_local_same_path_is_a_noop(tmp_path: Path) -> None:
+    # Real 3-host run (#91): with the default --data, the local host's peer writes its
+    # metrics.csv exactly where the driver collects it; copying it onto itself crashed.
+    f = tmp_path / "raw" / "kratos" / "metrics.csv"
+    f.parent.mkdir(parents=True)
+    f.write_text("t,direction,peer,type,size\n")
+    hs.fetch(hs.Host("kratos", "1"), str(f), f)
+    assert f.read_text() == "t,direction,peer,type,size\n"
+    other = tmp_path / "copy" / "metrics.csv"
+    hs.fetch(hs.Host("kratos", "1"), str(f), other)  # different path: still copied
+    assert other.read_text() == f.read_text()

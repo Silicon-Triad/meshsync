@@ -104,10 +104,12 @@ def resolve(host: Host, remote_repo: str) -> None:
 
 
 def fetch(host: Host, remote: str, local: Path) -> None:
-    """Copy one file from host to the driver."""
+    """Copy one file from host to the driver (no-op when the driver's own peer already wrote it
+    there: with the default --data the local host's run folder IS its collection folder)."""
     local.parent.mkdir(parents=True, exist_ok=True)
     if host.local:
-        shutil.copyfile(remote, local)
+        if Path(remote).resolve() != local.resolve():
+            shutil.copyfile(remote, local)
     else:
         subprocess.run(["scp", "-q", *SSH_OPTS, f"{host.target}:{remote}", str(local)],
                        check=True)  # fmt: skip
