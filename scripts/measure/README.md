@@ -2,7 +2,7 @@
 
 Experiment runners for the measurement plan (§11, R6).
 
-Owner: Huzaifa Hanif (@Huzaifa-Hanif-01). Related issues: #20, #68 (anon_mac), #69 (conditions 5-6), #70 (baseline).
+Owner: Huzaifa Hanif (@Huzaifa-Hanif-01). Related issues: #20, #68 (anon_mac), #69 (conditions 5-6), #70 (baseline), #77 (hosts).
 Rules: [`AGENTS.md`](../../AGENTS.md).
 
 ```bash
@@ -50,3 +50,15 @@ scripts/measure/run.py all --runs 5
   cross-check from `peer.py` metrics CSVs. Results: `data/baseline/README.md`.
 - **`anon_mac.py IN.pcapng OUT.pcapng` (#68):** replaces every unicast MAC in a pcapng capture
   with a stable fake (`02:00:00:00:00:NN`) before it is committed; everything else is unchanged.
+- **Across separate hosts (#77): `hosts.py EXPERIMENT HOST HOST [HOST ...]`.** Same experiments
+  and the same `data/<experiment>/run<k>.csv` columns as `run.py`, but one peer per host. Run it
+  on one host; the others are reached over SSH (`NAME:IP:user@IP`, one reused connection each).
+  The first host is the source (for `sources` the last is the joiner; for `impaired` the source
+  must be the local host, netem goes on its `--iface`, default `wlp2s0`, via cached `sudo`).
+  **One clock per number:** `e2e_s` runs from the receiver's first NOTIFY received to its last
+  CHUNK_DATA (`e2e_from = first_notify`; `joiner_start` for `sources`), `notify_s` is the
+  source's scan time on the source's clock. Each host needs `~/meshsync` with its `.venv`, the
+  secret `~/.meshsync/key`, certs named after the host (TLS), and the seeded #25 test data
+  (`scripts/gen_testdata.py testdata --sets A,D`; checked by SHA-256 before a run). Turn the
+  mini PC's Wi-Fi power saving off for these runs (#83). Raw per-host CSVs and logs:
+  `data/raw/hosts/` (gitignored).
