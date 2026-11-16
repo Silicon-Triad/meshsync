@@ -1,0 +1,35 @@
+% Network diagram of the 3-host deployment (R3). TikZ fragment: \input by
+% report/sections/03-architecture.tex; needs \usepackage{tikz} and the arrows.meta and
+% positioning libraries (report/preamble.tex). Issue #74.
+%
+% Values copied from data/deploy/README.md and data/deploy/<host>/host.txt (session of
+% 2026-11-12, #67): subnet 192.168.100.0/24, gateway 192.168.100.1, host IPs and interfaces.
+% Ports from src/meshsync/protocol/constants.py: UDP_PORT = 47000, TCP_PORT = 47001.
+% TCP arrows point from the side that dialled to the side that accepted, from the
+% "initiator handshake ok" lines in data/deploy/<host>/plain.log and tls.log.
+\begin{tikzpicture}[
+    font=\small,
+    host/.style={draw, rounded corners=2pt, align=center, inner sep=3pt, minimum width=3.3cm},
+    ap/.style={draw, align=center, inner sep=3pt, fill=black!5},
+    wifi/.style={densely dashed, gray},
+    tcp/.style={-{Stealth[length=2.2mm]}, thick},
+    lbl/.style={font=\footnotesize, fill=white, inner sep=1pt},
+  ]
+  % Hosts on a triangle (logical TCP mesh), access point in the middle (physical star).
+  \node[host] (kratos) at (-4.6,1.3) {\textbf{kratos}\\192.168.100.92/24, \texttt{wlp2s0}};
+  \node[host] (minipc) at (4.6,1.3) {\textbf{minipc}\\192.168.100.190/24, \texttt{wlp2s0}};
+  \node[host] (defalt) at (0,-2.2) {\textbf{defalt}\\192.168.100.80/24, \texttt{wlp4s0}};
+  \node[ap] (ap) at (0,0) {Wi-Fi access point / router\\192.168.100.1 (gateway)};
+
+  % Physical Wi-Fi links to the access point.
+  \foreach \h in {kratos, minipc, defalt} \draw[wifi] (ap) -- (\h);
+
+  % TCP full mesh (arrow = dialler -> acceptor).
+  \draw[tcp] (kratos.north east) to[bend left=12] node[lbl] {TCP 47001} (minipc.north west);
+  \draw[tcp] (kratos.south) to[bend right=12] node[lbl] {TCP 47001} (defalt.west);
+  \draw[tcp] (minipc.south) to[bend left=12] node[lbl] {TCP 47001} (defalt.east);
+
+  % UDP discovery: broadcast on the LAN.
+  \node[align=center, below=0.3cm of defalt]
+    {LAN 192.168.100.0/24; UDP 47000: ANNOUNCE/LEAVE broadcast to 255.255.255.255};
+\end{tikzpicture}

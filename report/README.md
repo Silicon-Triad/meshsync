@@ -57,18 +57,19 @@ How `main.tex` and `preamble.tex` enforce them:
 
 ## Page budget (suggestion only)
 
+Set by #73; §2–§4 revised by #74 (the protocol spec needs more room for R1 precision), which
+leaves 4.25 pages for §5–§10, to be split by #75.
+Measured on the #74 build (XeLaTeX, 12 pt): §2 about 4.4, §3 about 1.2 (+0.4 for its figure),
+§4 about 1.1 pages, so §2–§4 are over budget. Agreed: first collect all content, then trim and
+rephrase once the whole report is compiled.
+
 | § | Section | Pages |
 | - | ------- | ----- |
 | 1 | Introduction and option | 1 |
-| 2 | Protocol specification (R1) | 1.5 |
-| 3 | Architecture and deployment (R3) | 1.5 |
+| 2 | Protocol specification (R1) | 2.5 |
+| 3 | Architecture and deployment (R3) | 1.25 |
 | 4 | Implementation notes, transport (R2, R4) | 1 |
-| 5 | Capture and encapsulation (R5) | 1 |
-| 6 | Performance results and graphs (R6) | 1.5 |
-| 7 | Design tensions | 0.75 |
-| 8 | Sustainability | 0.5 |
-| 9 | Behaviour under failure (R7) | 0.75 |
-| 10 | Individual contributions | 0.5 |
+| 5–10 | Capture (R5), results (R6), design tensions, sustainability, failure (R7), contributions | 4.25 (split by #75) |
 | | **Total** | **10** |
 
 ## Building (optional local tool, not in CI)
@@ -95,7 +96,7 @@ grep "BODY PAGES" report/main.log
 
 Packages used (all in TeX Live and the Tectonic bundle): iftex, fontspec or newtx, geometry,
 array, booktabs, longtable, tabularx, graphicx, pdfpages, xcolor, refcount, caption, titlesec,
-fancyhdr, url, hyperref.
+fancyhdr, url, hyperref, tikz (libraries arrows.meta, positioning).
 
 ## Style and macros (`preamble.tex`)
 
