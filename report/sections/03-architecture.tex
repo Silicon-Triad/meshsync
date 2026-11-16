@@ -84,8 +84,10 @@ logger prefixes shortened with ``\ldots''):
 20:33:22,473 ...manager: peer up: kratos 192.168.100.92:0 (tls)
 20:33:22,488 ...connection: connection to kratos is SYNCED
 \end{verbatim}
-All three links reached SYNCED in both modes. In the plain run, a file was created on minipc,
+On the accepting side the logged port is 0: that field holds the peer's listening port, which
+the acceptor does not know when the link comes up. All three links reached SYNCED in both modes. In the plain run, a file was created on minipc,
 edited on defalt and deleted on kratos, and each change reached the other two hosts; in the TLS
 run, a file created on defalt had the same SHA-256 on all three hosts.
 % data/deploy/minipc/plain.log, data/deploy/defalt/tls.log (lines quoted with prefixes
-% shortened); data/deploy/README.md ("What was checked", checks 4-9).
+% shortened); data/deploy/README.md ("What was checked", checks 4-9). Port 0:
+% src/meshsync/net/manager.py PeerInfo.tcp_port ("0 if it dialled us and was never discovered").

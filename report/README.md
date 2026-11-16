@@ -59,6 +59,9 @@ How `main.tex` and `preamble.tex` enforce them:
 
 Set by #73; §2–§4 revised by #74 (the protocol spec needs more room for R1 precision), which
 leaves 4.25 pages for §5–§10, to be split by #75.
+Measured on the #74 build (XeLaTeX, 12 pt): §2 about 4.4, §3 about 1.2 (+0.4 for its figure),
+§4 about 1.1 pages, so §2–§4 are over budget. Agreed: first collect all content, then trim and
+rephrase once the whole report is compiled.
 
 | § | Section | Pages |
 | - | ------- | ----- |

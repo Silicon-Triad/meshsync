@@ -180,6 +180,7 @@ Tables~\ref{tab:msg-formats} and~\ref{tab:errors}.
 \bottomrule
 \endlastfoot
 HANDSHAKE & AUTH\_OK sent (R) / received (I); with TLS, CN check passed & send INDEX\_REQ & AUTHENTI\-CATED \\
+HANDSHAKE & any message other than the next handshake message & ERROR ILLEGAL\_STATE, close & CLOSED \\
 HANDSHAKE & ERROR received, or 10\,s elapsed & close, no reply & CLOSED \\
 AUTHENTI\-CATED & INDEX for our INDEX\_REQ (or it failed or took $>$ 10\,s) & compare entries & SYNCED \\
 any open & fatal error detected (validation order; Tables~\ref{tab:msg-formats}, \ref{tab:errors}) & send ERROR (REQ\_ID 0 unless answering a request), close & CLOSED \\
