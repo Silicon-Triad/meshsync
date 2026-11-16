@@ -1,9 +1,84 @@
 % !TEX root = ../main.tex
-% Section 9. Suggested page budget: 0.75 page (suggestion only).
-% Filled by: #75 (R7). Sources: PROJECT_CONTEXT.md §10, tests/integration/test_failures.py
-% (#63), data/captures/README.md (R7 evidence, #68).
+% Section 9. Page budget: part of the 4.25 pages for §5-§10 (report/README.md).
+% Filled by #75 stage 1 (R7). Sources: PROJECT_CONTEXT.md §10, docs/PROTOCOL.md,
+% data/captures/README.md and cap2-cap5 (+ logs, #68), tests/integration/ (#62, #63).
+% Frame numbers and counts from tshark 4.2.2 with tools/wireshark/meshsync.lua. Log times are
+% defalt's (UTC); kratos logs are 5 h ahead (data/captures/README.md), converted where quoted.
 \section{Behaviour under failure (R7)}
 \label{sec:failure}
 
-\TODO{filled by \#75: designed behaviour for each failure scenario, with log and capture
-evidence.}
+For each failure scenario we give the designed behaviour, what happened on the real hosts, and
+the evidence (captures are kratos's view, taken between kratos and defalt; Section~\ref{sec:capture}).
+
+\textbf{Wrong secret} (designed: the HMAC checks reject the peer, ERROR 0x04, close). The secret
+is checked twice. First, discovery: kratos's ANNOUNCEs carry a tag made with a different secret,
+so defalt drops each one at receive rule~3 and never dials. \code{cap2} has 14 datagrams
+(12 ANNOUNCE, 2 LEAVE) and no TCP frame at all; defalt logs
+\code{drop D5A6E688 from 192.168.100.92: bad tag} every 5\,s. Second, with a static peer
+(\code{--peer}) to reach the TCP handshake (\code{cap2b}): HELLO (frame 6) $\rightarrow$
+HELLO\_ACK (8) $\rightarrow$ ERROR \code{\{"code": 4, "msg": "AUTH\_FAILED: bad mac\_r"\}} (10)
+$\rightarrow$ FIN from both sides (11, 12). The dialler, defalt, detects the wrong \code{mac\_r}
+first (log 13:41:33: \code{initiator handshake failed: AUTH\_FAILED: bad mac\_r}). The attempt
+runs four times in the capture, about every 5\,s, and no meshsync message beyond the handshake is
+ever sent.
+% cap2: 14 frames, 0 tcp; disc types from meshsync.disc.type; cap2-defalt.log 13:38:53-.
+% cap2b frames 6/8/10/11/12 and 20/22/24 (11.77 s); 4 x HELLO, 4 x HELLO_ACK, 4 x ERROR;
+% cap2b-defalt.log 13:41:33,557. PROTOCOL.md §3.4 rule 3, §5.2, §10 (0x04 fatal).
+
+\textbf{Spoofed or replayed ANNOUNCE} (designed: dropped, bad tag or stale \code{ts}). The bad-tag
+case is the one above. The replay check also fired on real traffic: during \code{cap1} defalt
+dropped two of kratos's ANNOUNCEs (\code{drop 953B75EA from 192.168.100.92: replay ts 1794662842},
+13:27:24). kratos's own timestamps strictly increase in the capture, so defalt most likely
+received the same broadcast twice over Wi-Fi, and the check dropped the copy as designed. A
+spoofed and a replayed datagram are also tested on localhost
+(\code{test\_spoofed\_and\_replayed\_announce\_dropped}).
+% cap1-defalt.log (2 "replay ts" lines); data/captures/README.md ("Observations");
+% tests/integration/test_failures.py.
+
+\textbf{Untrusted certificate} (designed: TLS alert, close). defalt used a certificate from a
+different CA. In \code{cap3}: Client Hello from defalt (frame 7) $\rightarrow$ Server Hello (9)
+$\rightarrow$ Alert, level Fatal, description Unknown CA, from defalt (14). The handshake fails
+before any meshsync message, and repeats every 5\,s (alerts in frames 14, 27, 40 and 53; no meshsync
+message in the whole capture). defalt logs \code{TLS handshake failed (client side):
+[SSL: CERTIFICATE\_VERIFY\_FAILED]} (13:55:31) and kratos \code{tlsv1 alert unknown ca}. A TLS/plain
+mode mismatch is tested on localhost (\code{test\_tls\_plain\_mode\_mismatch\_closed}).
+% cap3: tls.alert_message level 2, desc 48 (Unknown CA) from 192.168.100.80 in frames
+% 14/27/40/53; 0 meshsync.type frames; cap3-defalt.log, cap3-kratos.log 18:55:31 (= 13:55:31 UTC).
+
+\textbf{Peer killed mid-transfer} (designed: outstanding chunks are reassigned and the file
+completes). We killed defalt, the receiver, with \code{kill -9} during the 100\,MiB transfer. Its
+kernel closed the socket at once: a FIN (frame 48679, $t = 91.0$\,s) followed by 421 RSTs for the
+data still arriving. kratos logged \code{peer down: defalt ... peer closed connection} (13:58:54
+UTC) and discovery expired defalt 11\,s later. kratos's dial attempts at 96.3\,s and 101.4\,s
+were refused with RST (frames 49212, 49215), since nothing listened on defalt; after defalt restarted, the handshake ran again (HELLO, frame 49223,
+$t = 117.8$\,s) and defalt logged \code{fetching large.bin: 633 of 1403 chunks from 1 peers}: the
+770 chunks stored before the kill were kept, not fetched again. The file was then assembled
+(\code{assembled large.bin (104857600 bytes, 1403 chunks)}, 13:59:55). With only two hosts in
+the capture there was no other source; reassigning chunks to another peer is tested on
+localhost with three peers (\code{test\_peer\_killed\_mid\_transfer\_completes\_from\_other\_peer}).
+% cap4: tcp.flags.fin frame 48679 (90.988 s) from .80; 421 tcp.flags.reset frames from .80
+% before 92 s; SYN from .92 at 96.28/101.41/117.78 s, RST+ACK from .80 in 49212/49215; HELLO (0x01) frame 49223 (117.79 s).
+% cap4-kratos.log 18:58:54 / 18:59:05 (expired); cap4-defalt.log 13:59:21,521 and 13:59:55,178.
+
+\textbf{5\,\% packet loss} (designed: completes, slower; TCP retransmissions visible). With
+\code{scripts/netem.sh} adding 5\,\% loss on kratos, a 10\,MiB file (144 chunks) still arrived
+intact. \code{cap5} holds 12\,417 frames: kratos sent 7\,935 data segments, of which 402 were
+retransmissions (5.1\,\%), 52 of them fast retransmissions, and the receiver sent 715 duplicate
+ACKs. defalt's fetch took 57.6\,s (14:03:33.3 to 14:04:30.9), about 1.5\,Mbit/s against about
+7.9\,Mbit/s without loss in \code{cap1}: TCP kept the data correct and paid in time. Under the same
+loss, discovery expired kratos twice while the TCP connection kept working, because broadcast
+frames are not retransmitted on Wi-Fi.
+% cap5: tcp.analysis.retransmission 402, fast_retransmission 52, duplicate_ack 715;
+% ip.src==.92 && tcp.len>0: 7935; total 12417. cap5-defalt.log 14:03:33,325 (fetching),
+% 14:04:30,946 (fetched all), 14:04:31,047 (assembled 10485760 bytes), expired 14:04:00, 14:04:55.
+% 10485760 x 8 / 57.62 s = 1.46 Mbit/s; cap1 rate from data/captures/README.md ("Observations").
+
+\textbf{Scenarios tested on localhost only.} Concurrent edits on two hosts produce a conflict
+copy (\code{test\_concurrent\_edit\_makes\_conflict\_copy}), and a peer that was offline while files
+changed catches up through the index exchange when it rejoins
+(\code{test\_offline\_peer\_catches\_up}). These run as real \code{meshsync} processes on
+\code{127.0.0.1} in \code{tests/integration/} (run in CI), not on the three hosts. The corrupt-chunk
+scenario (hash mismatch, re-request from another peer) is designed (\code{PROTOCOL.md} §5.9) but
+not yet tested: its test approach is still open.
+% tests/integration/test_sync.py, test_failures.py (module docstring: corrupt chunk not there),
+% tests/integration/README.md.
