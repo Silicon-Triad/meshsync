@@ -10,7 +10,9 @@ Usage: scripts/measure/hosts.py EXPERIMENT HOST HOST [HOST ...] [--runs 5] [--tl
 Run it on one host (the driver); the others are reached over SSH, one reused connection each
 (one password prompt per host). The FIRST host is the source; the others receive. For
 `sources` the last host is the joiner. For `impaired` the source must be this machine: netem is
-applied to its --iface (default wlp2s0) through sudo, cached once at the start (`sudo -v`).
+applied to its --iface (default wlp2s0) through sudo: asked once at the start (`sudo -v`), kept
+alive every minute for the whole run, and clearing netem falls back to an interactive sudo
+rather than ever leaving the Wi-Fi impaired (#91).
 
 Every host needs the repo at ~/meshsync (--remote-repo) with its .venv, the shared secret at
 ~/.meshsync/key, certs named after the host in ~/.meshsync/certs (for --tls / `tls`), and the
@@ -39,8 +41,10 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -54,6 +58,7 @@ log = logging.getLogger("measure.hosts")
 SSH_OPTS = ["-o", "ControlMaster=auto", "-o", "ControlPath=~/.ssh/cm-hosts-%r@%h:%p",
             "-o", "ControlPersist=30m"]  # fmt: skip
 STOP_WAIT_S = 10  # harness: seconds a peer gets to exit after SIGINT before SIGKILL
+SUDO_KEEPALIVE_S = 60  # harness: refresh cached sudo well inside sudo's default 5 min timeout
 _SYNCED_RE = re.compile(r"connection to (\S+) is SYNCED")
 
 
@@ -357,6 +362,51 @@ def measure(mesh: HostMesh, step: mr.Step, src: Host, receivers: list[Host],
     return Pending(step, src, receivers, s_t0, r_t0, done, size)
 
 
+# ---------------------------------------------------------------- netem with a safe clear (cond. 5)
+
+
+def keep_sudo_alive(stop: threading.Event, interval: float = SUDO_KEEPALIVE_S) -> None:
+    """Refresh the cached sudo credential until stop is set (runs in a daemon thread).
+
+    A condition-5 batch lasts far longer than sudo's cache; without this the final netem clear
+    failed on the real 3-host run and left the source's Wi-Fi impaired (#91).
+    """
+    while not stop.wait(interval):
+        r = subprocess.run(["sudo", "-n", "-v"], capture_output=True)
+        if r.returncode != 0:
+            log.warning("could not refresh sudo; netem clear will ask for the password")
+
+
+def clear_netem(iface: str) -> None:
+    """Clear netem on iface; never leave the link impaired. Non-interactive first (sudo -n),
+    then an interactive sudo (asks for the password) if the cached credential has expired."""
+    try:
+        subprocess.run(mr.netem_cmd("clear", iface), check=True)
+        return
+    except subprocess.CalledProcessError:
+        if os.geteuid() == 0:
+            raise
+        log.error("netem clear on %s failed without a password; asking sudo interactively", iface)
+    try:
+        subprocess.run(["sudo", str(mr.NETEM_SH), "clear", iface], check=True)
+    except subprocess.CalledProcessError:
+        log.critical("netem may still be ON: run  sudo %s clear %s", mr.NETEM_SH, iface)
+        raise
+
+
+@contextmanager
+def netem_link(iface: str, profile: list[str] | None) -> Iterator[None]:
+    """Impair iface for the block; always cleared afterwards, even on errors (cond. 5)."""
+    clear_netem(iface)
+    try:
+        if profile is not None:
+            subprocess.run(mr.netem_cmd("apply", iface, *profile), check=True)
+            log.info("netem on %s: %s", iface, " ".join(profile))
+        yield
+    finally:
+        clear_netem(iface)
+
+
 # ---------------------------------------------------------------- experiments (§11)
 
 
@@ -443,7 +493,7 @@ def exp_impaired(run: int, hosts: list[Host], args: argparse.Namespace,
         with HostMesh(hosts, args, "impaired", run, variant) as mesh:
             src, *rcv = hosts
             start_all(mesh, hosts)
-            with mr.netem(args.iface, profile):
+            with netem_link(args.iface, profile):
                 pend = [measure(mesh, mr.Step("impaired", variant, run, mr.A), src, rcv,
                                 manifest, sizes)]  # fmt: skip
         rows += rows_of(mesh, pend)
@@ -535,7 +585,9 @@ def main(argv: list[str] | None = None) -> int:
         p.error(f"no {args.testdata}/MANIFEST.sha256; run scripts/gen_testdata.py first")
     names = list(EXPERIMENTS) if args.experiment == "all" else [args.experiment]
     if "impaired" in names and os.geteuid() != 0:
-        subprocess.run(["sudo", "-v"], check=True)  # cache sudo once for netem (condition 5)
+        subprocess.run(["sudo", "-v"], check=True)  # ask once for netem (condition 5) ...
+        stop = threading.Event()  # ... and keep it cached for the whole batch
+        threading.Thread(target=keep_sudo_alive, args=(stop,), daemon=True).start()
     for h in hosts:
         resolve(h, args.remote_repo)
     check_testdata(hosts, args, manifest)

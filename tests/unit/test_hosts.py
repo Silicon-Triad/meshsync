@@ -103,3 +103,46 @@ def test_fetch_local_same_path_is_a_noop(tmp_path: Path) -> None:
     other = tmp_path / "copy" / "metrics.csv"
     hs.fetch(hs.Host("kratos", "1"), str(f), other)  # different path: still copied
     assert other.read_text() == f.read_text()
+
+
+def _runs(monkeypatch: pytest.MonkeyPatch, fail_first_clear: bool) -> list[list[str]]:
+    calls: list[list[str]] = []
+
+    def fake(cmd: list[str], **kw: object) -> "hs.subprocess.CompletedProcess[bytes]":
+        calls.append(list(cmd))
+        if fail_first_clear and len(calls) == 1:
+            raise hs.subprocess.CalledProcessError(1, cmd)
+        return hs.subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(hs.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(mr.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(hs.subprocess, "run", fake)
+    return calls
+
+
+def test_clear_netem_falls_back_to_interactive_sudo(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Real 3-host run (#91): sudo's cache expired mid-batch and `sudo -n ... clear` failed,
+    # leaving 5 % loss on the Wi-Fi. The clear must fall back to asking for the password.
+    calls = _runs(monkeypatch, fail_first_clear=True)
+    hs.clear_netem("wlp2s0")
+    assert calls[0][:2] == ["sudo", "-n"]  # non-interactive first
+    assert calls[1] == ["sudo", str(mr.NETEM_SH), "clear", "wlp2s0"]  # then interactive
+
+
+def test_netem_link_clears_even_when_the_run_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _runs(monkeypatch, fail_first_clear=False)
+    with pytest.raises(TimeoutError), hs.netem_link("wlp2s0", ["loss", "5"]):
+        raise TimeoutError("receiver never got the file")
+    assert calls[-1][-2:] == ["clear", "wlp2s0"]
+    assert any(c[-3:] == ["wlp2s0", "loss", "5"] for c in calls)
+
+
+def test_keep_sudo_alive_refreshes_until_stopped(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _runs(monkeypatch, fail_first_clear=False)
+    stop = hs.threading.Event()
+    t = hs.threading.Thread(target=hs.keep_sudo_alive, args=(stop, 0.01))
+    t.start()
+    hs.time.sleep(0.1)
+    stop.set()
+    t.join(1)
+    assert not t.is_alive() and calls and all(c == ["sudo", "-n", "-v"] for c in calls)
