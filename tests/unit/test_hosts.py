@@ -146,3 +146,52 @@ def test_keep_sudo_alive_refreshes_until_stopped(monkeypatch: pytest.MonkeyPatch
     stop.set()
     t.join(1)
     assert not t.is_alive() and calls and all(c == ["sudo", "-n", "-v"] for c in calls)
+
+
+def _fake_ssh(monkeypatch: pytest.MonkeyPatch, codes: list[int]) -> list[list[str]]:
+    calls: list[list[str]] = []
+
+    def fake(cmd: list[str], **kw: object) -> "hs.subprocess.CompletedProcess[str]":
+        calls.append(cmd)
+        code = codes[min(len(calls) - 1, len(codes) - 1)]
+        return hs.subprocess.CompletedProcess(cmd, code, "out", "Broken pipe")
+
+    monkeypatch.setattr(hs.subprocess, "run", fake)
+    monkeypatch.setattr(hs, "SSH_RETRY_WAIT_S", 0)
+    return calls
+
+
+def test_read_only_command_retries_a_dropped_ssh_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Real batch (#77): the shared SSH connection to minipc dropped mid-run
+    # ("mux_client_request_session: read from master failed: Broken pipe") and the poll failed.
+    calls = _fake_ssh(monkeypatch, [255, 255, 0])
+    assert hs.sh(hs.Host("minipc", "1", "u@1"), "stat x", retry=True) == "out"
+    assert len(calls) == 3
+
+
+def test_side_effect_commands_are_never_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _fake_ssh(monkeypatch, [255, 0])
+    with pytest.raises(RuntimeError, match="Broken pipe"):
+        hs.sh(hs.Host("minipc", "1", "u@1"), "start a peer")  # retry defaults to False
+    assert len(calls) == 1
+
+
+def test_retry_gives_up_after_ssh_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = _fake_ssh(monkeypatch, [255])
+    with pytest.raises(RuntimeError):
+        hs.sh(hs.Host("minipc", "1", "u@1"), "stat x", retry=True)
+    assert len(calls) == hs.SSH_RETRIES + 1
+
+
+def test_ssh_options_keep_the_connection_alive() -> None:
+    assert "ServerAliveInterval=15" in hs.SSH_OPTS
+
+
+def test_resume_runs_only_the_missing_ones(tmp_path: Path) -> None:
+    for k in (1, 2, 3, 5):
+        (tmp_path / f"run{k}.csv").write_text("x")
+    assert hs.runs_to_do(tmp_path, 5, resume=True) == [4]
+    assert hs.runs_to_do(tmp_path, 5, resume=False) == [1, 2, 3, 4, 5]
+    assert hs.runs_to_do(tmp_path / "none", 2, resume=True) == [1, 2]
