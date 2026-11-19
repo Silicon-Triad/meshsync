@@ -1,0 +1,5 @@
+experiment,variant,run,receiver,file,size,e2e_s,notify_s,transfer_s,chunk_msgs,chunk_bytes,recv_bytes,sent_bytes,sources,source_bytes,e2e_from,poll_s,suspect,setup_s
+full_delta,full,2,minipc,large/large.bin,104857600,200.932812,27.911158,200.905485,1403,104874436,105163789,519316,2,defalt:65573;kratos:104808863,first_notify,0.500000,,
+full_delta,full,2,defalt,large/large.bin,104857600,253.530604,27.911158,253.466254,1403,104874436,105163402,383169,2,kratos:104671251;minipc:203185,first_notify,0.500000,,
+full_delta,delta,2,minipc,edits/overwrite.bin,104857600,0.875917,18.964407,0.816681,1,75667,171692,469,1,kratos:75667,first_notify,0.500000,,
+full_delta,delta,2,defalt,edits/overwrite.bin,104857600,0.793565,18.964407,0.739650,1,75667,171653,506,1,kratos:75667,first_notify,0.500000,,

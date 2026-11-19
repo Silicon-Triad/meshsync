@@ -1,0 +1,7 @@
+experiment,variant,run,receiver,file,size,e2e_s,notify_s,transfer_s,chunk_msgs,chunk_bytes,recv_bytes,sent_bytes,sources,source_bytes,e2e_from,poll_s,suspect,setup_s
+impaired,clean,3,minipc,large/large.bin,104857600,117.747301,29.252148,117.707927,1403,104874436,105036599,3628603,2,defalt:8627331;kratos:96247105,first_notify,0.500000,,
+impaired,clean,3,defalt,large/large.bin,104857600,110.102394,29.252148,110.040675,1403,104874436,105033836,8813333,2,kratos:101422660;minipc:3451776,first_notify,0.500000,,
+impaired,loss,3,minipc,large/large.bin,104857600,412.895665,28.317883,412.854081,1403,104874436,105245000,33795232,2,defalt:65570;kratos:104808866,first_notify,0.500000,,
+impaired,loss,3,defalt,large/large.bin,104857600,451.826231,28.317883,451.771143,1403,104874436,105284203,425808,2,kratos:71420818;minipc:33453618,first_notify,0.500000,,
+impaired,delay,3,minipc,large/large.bin,104857600,103.881331,27.769171,103.841315,1403,104874436,105163558,316936,1,kratos:104874436,first_notify,0.500000,,
+impaired,delay,3,defalt,large/large.bin,104857600,65.713827,27.769171,65.644084,1403,104874436,105162425,316031,1,kratos:104874436,first_notify,0.500000,,
