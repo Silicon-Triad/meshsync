@@ -195,3 +195,37 @@ def test_resume_runs_only_the_missing_ones(tmp_path: Path) -> None:
     assert hs.runs_to_do(tmp_path, 5, resume=True) == [4]
     assert hs.runs_to_do(tmp_path, 5, resume=False) == [1, 2, 3, 4, 5]
     assert hs.runs_to_do(tmp_path / "none", 2, resume=True) == [1, 2]
+
+
+def test_stop_retries_the_kill_and_the_cleanup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # Review on #93: if SSH drops during stop(), the remote peer was never killed and kept
+    # holding TCP 47001, so every later run on that host failed. Killing again is harmless.
+    seen: list[tuple[str, bool]] = []
+    monkeypatch.setattr(hs, "sh", lambda h, s, check=True, retry=False: seen.append((s, retry)))
+    monkeypatch.setattr(hs, "fetch", lambda *a: None)
+    args = argparse.Namespace(data=tmp_path, keep_data=False)
+    hs.HostMesh([hs.Host("minipc", "1", "u@1")], args, "x", 1, "v").stop()
+    assert any("kill -INT" in s for s, _ in seen) and all(r for _, r in seen)
+
+
+def test_fetch_retries_a_dropped_scp(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls = _fake_ssh(monkeypatch, [1, 0])
+    hs.fetch(hs.Host("minipc", "1", "u@1"), "/r/metrics.csv", tmp_path / "m.csv")
+    assert len(calls) == 2 and calls[0][0] == "scp"
+
+
+def test_fetch_gives_up_after_ssh_retries(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    calls = _fake_ssh(monkeypatch, [1])
+    with pytest.raises(hs.subprocess.CalledProcessError):
+        hs.fetch(hs.Host("minipc", "1", "u@1"), "/r/metrics.csv", tmp_path / "m.csv")
+    assert len(calls) == hs.SSH_RETRIES + 1
+
+
+def test_log_run_records_when_each_run_was_measured(tmp_path: Path) -> None:
+    hs.log_run(tmp_path, 4, 0.0, 60.0)
+    hs.log_run(tmp_path, 5, 86400.0, 86460.0)  # e.g. redone by --resume the next day
+    lines = (tmp_path / hs.RUNS_LOG).read_text().splitlines()
+    assert [ln.split()[0] for ln in lines] == ["run4", "run5"]
+    assert lines[0].split()[1] != lines[1].split()[1]  # different dates are visible
