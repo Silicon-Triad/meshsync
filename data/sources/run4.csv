@@ -1,0 +1,3 @@
+experiment,variant,run,receiver,file,size,e2e_s,notify_s,transfer_s,chunk_msgs,chunk_bytes,recv_bytes,sent_bytes,sources,source_bytes,e2e_from,poll_s,suspect,setup_s
+sources,1src,4,defalt,large/large.bin,104857600,77.477341,,76.960785,1403,104874436,104970626,124106,1,kratos:104874436,joiner_start,0.500000,,
+sources,2src,4,defalt,large/large.bin,104857600,82.363228,,81.806111,1403,104874436,105258195,126374,2,kratos:61046342;minipc:43828094,joiner_start,0.500000,,
