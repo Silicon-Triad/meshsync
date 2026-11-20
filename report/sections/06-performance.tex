@@ -1,9 +1,197 @@
 % !TEX root = ../main.tex
-% Section 6. Suggested page budget: 1.5 pages (suggestion only).
-% Filled by: #75 (R6). Sources: analysis/analyze.py -> analysis/out/ (tables, graphs, #71),
-% data/<experiment>/ (#20, #69), data/baseline/ (#70), plan in PROJECT_CONTEXT.md §11.
+% Section 6. Page budget: part of the 4.25 pages for §5-§10 (report/README.md).
+% Filled by #75. Stage 1 (this version): the network baseline only, from data/baseline/ (#70,
+% #83). Stage 2 adds the §11 experiments from #77 (analysis/out/, #71).
 \section{Performance measurement, results and graphs (R6)}
 \label{sec:performance}
 
-\TODO{filled by \#75: method, conditions, results (mean $\pm$ std dev over repeated runs) and
-graphs from analysis/out/.}
+\subsection{Network baseline}
+\label{sec:baseline}
+
+Before measuring meshsync we measured the network itself on the demo LAN (14 November 2026), in
+each direction between the three hosts: round-trip time with \code{ping} (5 runs of 10 echoes;
+each run's average is one sample), meshsync's own PING/PONG round trips from a 3-minute
+plain-mode run (Table~\ref{tab:rtt}), and the TCP throughput ceiling with \code{iperf3} (5 runs of
+10\,s, receiver side, 1\,Mbit = $10^6$ bit; Table~\ref{tab:iperf}). Values are mean $\pm$ sample
+standard deviation; ``src $\rightarrow$ dst'' is the side that sends the echo request or the data.
+% data/baseline/README.md ("Files", method settings, "Results"); summary.csv; pingpong.csv.
+
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.30\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.35\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.35\linewidth-2\tabcolsep\relax}}
+\caption{Round-trip time between the hosts (ms).}\label{tab:rtt}\\
+\toprule
+\colhead{src $\rightarrow$ dst} & \colhead{\code{ping} (n = 5 runs)} & \colhead{meshsync PING/PONG (n)} \\
+\midrule
+\endfirsthead
+\multicolumn{3}{@{}l}{\tablecontinued}\\
+\toprule
+\colhead{src $\rightarrow$ dst} & \colhead{\code{ping} (n = 5 runs)} & \colhead{meshsync PING/PONG (n)} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+kratos $\rightarrow$ defalt & 9.70 $\pm$ 10.27 & 10.91 $\pm$ 5.59 (20) \\
+defalt $\rightarrow$ kratos & 8.55 $\pm$ 3.42 & 10.87 $\pm$ 4.81 (20) \\
+kratos $\rightarrow$ minipc & 68.02 $\pm$ 25.97 & 71.82 $\pm$ 29.38 (21) \\
+minipc $\rightarrow$ kratos & 14.24 $\pm$ 10.78 & 13.19 $\pm$ 3.56 (21) \\
+minipc $\rightarrow$ defalt & 17.34 $\pm$ 13.81 & 17.15 $\pm$ 14.62 (21) \\
+defalt $\rightarrow$ minipc & 56.53 $\pm$ 5.61 & 35.98 $\pm$ 20.42 (20) \\
+\end{reptable}
+% ping: data/baseline/summary.csv (metric rtt_ms, n 5). PING/PONG: data/baseline/pingpong.csv,
+% mean and sample sd per (host, peer) computed from its rtt_ms rows (n 20-21).
+
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.4\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.6\linewidth-2\tabcolsep\relax}}
+\caption{TCP throughput ceiling, \code{iperf3} (n = 5 runs).}\label{tab:iperf}\\
+\toprule
+\colhead{src $\rightarrow$ dst} & \colhead{Throughput (Mbit/s)} \\
+\midrule
+\endfirsthead
+\multicolumn{2}{@{}l}{\tablecontinued}\\
+\toprule
+\colhead{src $\rightarrow$ dst} & \colhead{Throughput (Mbit/s)} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+kratos $\rightarrow$ defalt & 16.58 $\pm$ 0.78 \\
+defalt $\rightarrow$ kratos & 7.66 $\pm$ 1.26 \\
+kratos $\rightarrow$ minipc & 14.29 $\pm$ 3.62 \\
+minipc $\rightarrow$ kratos & 27.59 $\pm$ 1.41 \\
+minipc $\rightarrow$ defalt & 10.45 $\pm$ 2.63 \\
+defalt $\rightarrow$ minipc & 10.38 $\pm$ 1.34 \\
+\end{reptable}
+% data/baseline/summary.csv (metric throughput_mbps, n 5).
+
+\textbf{Interpreting the RTT.} Each round trip is the sum of the nodal delays
+$d_\mathrm{proc} + d_\mathrm{queue} + d_\mathrm{trans} + d_\mathrm{prop}$ on every hop, and here every
+packet crosses the air twice (sender to access point to receiver) on one shared channel. On one
+LAN $d_\mathrm{prop}$ is negligible, and $d_\mathrm{trans}$ is small for short echo frames, so the
+spread comes from queueing and waiting for the channel. The data show this: the fastest single
+echo in any run took 2.1\,ms, run averages reach 98.6\,ms, single echoes up to 348.8\,ms, and the
+standard deviations are often comparable to the means. Three runs lost one of their ten echoes. The
+clearest pattern is that traffic \emph{to} minipc is slow (57--68\,ms) while traffic \emph{from}
+it is fast (14--17\,ms): Wi-Fi power saving is on for minipc, so the access point holds frames
+for it until its radio wakes. That waiting is queueing delay, not distance. meshsync's PING/PONG
+agrees with \code{ping} within 4\,ms in five of six directions, usually slightly above it,
+which fits our own extra $d_\mathrm{proc}$ (Python, framing, the reader thread). The exception, defalt $\rightarrow$
+minipc (36 vs 57\,ms), also waits on minipc's sleep cycle, and the high standard deviation (20\,ms)
+reflects when each probe happened to arrive. The \code{iperf3} ceiling is 7.7--27.6\,Mbit/s and
+depends on direction (defalt sends at 7.7 but receives at 16.6\,Mbit/s): this is the upper bound
+for any meshsync transfer between these hosts.
+% data/baseline/rtt.csv: min(min_ms) 2.077 (defalt->kratos run 2), max(avg_ms) 98.608
+% (kratos->minipc run 5), max(max_ms) 348.817 (minipc->defalt run 4), loss_pct 10 in 3 runs.
+% Power save and the defalt->minipc explanation: data/baseline/README.md ("Anomalies").
+% PROJECT_CONTEXT.md §11 (delay model).
+
+\subsection{Experiments}
+\label{sec:experiments}
+
+\textbf{Method.} We ran the §11 conditions on the same three hosts (18--19 November 2026), with
+kratos as the driver and source and minipc and defalt as receivers, each condition 5 times. The
+workload is set A: a 100\,MiB file (104\,857\,600 bytes), then a 1\,KiB overwrite (delta) or a 1\,KiB
+insert at offset 0 (fixed vs content-defined chunking). Impairment is \code{tc netem} on kratos's
+Wi-Fi interface: 5\,\% loss, or 50\,ms added delay. For each run, the receivers' values are averaged
+first; we then report mean $\pm$ sample standard deviation over the n = 5 runs, as
+\code{analysis/analyze.py} computes it. Throughput is chunk bytes divided by transfer time, in MB/s
+($10^6$ bytes). One TLS row that \code{analyze.py} flags as a duplicate fetch (\#60) is excluded.
+Table~\ref{tab:experiments} gives the results; Figures~\ref{fig:exp-full-delta}
+and~\ref{fig:exp-impaired} show two of them. The chunk-size condition (16/64/256\,KiB) was not
+run.
+% data/README.md (§11 multi-host results: setup, interruptions, tls/run4 flagged);
+% scripts/measure/run.py impaired_profiles, LOSS_PCT_DEFAULT 5, DELAY_MS_DEFAULT 50 (hosts.py
+% --loss-pct/--delay-ms defaults; data/README.md records no other value); analysis/README.md
+% (statistics, throughput). Tables: analysis/out/<experiment>.md from analysis/analyze.py.
+
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.22\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.12\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.22\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.20\linewidth-2\tabcolsep\relax}}
+\caption{§11 conditions, mean $\pm$ sd over n = 5 runs.}\label{tab:experiments}\\
+\toprule
+\colhead{Condition} & \colhead{Variant} & \colhead{Transfer time (s)} & \colhead{Chunk bytes received} & \colhead{Throughput (MB/s)} \\
+\midrule
+\endfirsthead
+\multicolumn{5}{@{}l}{\tablecontinued}\\
+\toprule
+\colhead{Condition} & \colhead{Variant} & \colhead{Transfer time (s)} & \colhead{Chunk bytes received} & \colhead{Throughput (MB/s)} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+1 Full vs delta & full & 227.5 $\pm$ 74.99 & 104\,874\,436 & 0.5116 $\pm$ 0.1564 \\
+ & delta & 5.204 $\pm$ 10.92 & 75\,667 & 0.3633 $\pm$ 0.3376 \\
+2 Fixed vs CDC (insert) & fixed & 143.1 $\pm$ 49.58 & 104\,877\,836 & 0.8572 $\pm$ 0.4003 \\
+ & CDC & 0.3006 $\pm$ 0.4061 & 66\,594 & 0.5789 $\pm$ 0.3944 \\
+3 Sources & 1 source & 73.33 $\pm$ 30.9 & 104\,894\,652 $\pm$ 45\,205 & 1.66 $\pm$ 0.7107 \\
+ & 2 sources & 66.05 $\pm$ 10.22 & 104\,874\,436 & 1.617 $\pm$ 0.2347 \\
+5 Link & clean & 116.4 $\pm$ 33.57 & 104\,874\,436 & 1.031 $\pm$ 0.2897 \\
+ & 5\,\% loss & 474.2 $\pm$ 143.7 & 104\,874\,436 & 0.2352 $\pm$ 0.05852 \\
+ & +50\,ms delay & 118.8 $\pm$ 27.07 & 104\,874\,436 & 0.946 $\pm$ 0.2376 \\
+6 Security & plain & 102.9 $\pm$ 16.81 & 104\,874\,436 & 1.055 $\pm$ 0.1655 \\
+ & TLS & 90.76 $\pm$ 19.55 & 105\,160\,119 $\pm$ 620\,599 & 1.23 $\pm$ 0.2855 \\
+\end{reptable}
+% analysis/out/{full_delta,fixed_cdc,sources,impaired,tls}.md (chunk bytes sd 0 except where
+% shown; 1 source: 104,894,652 +- 45,205). Connection setup time (tls.md): plain 0.6517 +- 1.078 s,
+% TLS 0.2537 +- 0.05434 s.
+
+\begin{figure}[!htbp]\centering
+  \begin{minipage}[t]{0.48\linewidth}\centering
+    \fitgraphic[0.27\textheight]{exp-full-delta.pdf}
+    \caption{Chunk bytes received, full copy vs delta (log scale, n = 5, $\pm$1 sd).}
+    \label{fig:exp-full-delta}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.48\linewidth}\centering
+    \fitgraphic[0.27\textheight]{exp-impaired.pdf}
+    \caption{Transfer time of the 100\,MiB file: clean, 5\,\% loss, +50\,ms delay (n = 5, $\pm$1 sd).}
+    \label{fig:exp-impaired}
+  \end{minipage}
+\end{figure}
+% report/figures/exp-full-delta.pdf, exp-impaired.pdf: copies of analysis/out/full_delta.pdf,
+% impaired.pdf (analysis/analyze.py).
+
+\textbf{RTT, throughput and the representative operation.} RTT is in Table~\ref{tab:rtt}
+(5 runs of \code{ping}, and 20--21 meshsync PING/PONG samples per direction). The representative
+operation, syncing the 100\,MiB file to two receivers, took $116.4 \pm 33.6$\,s on the clean link
+(condition 5), about $1.03$\,MB/s or 8.2\,Mbit/s. That is about 50--58\,\% of the \code{iperf3}
+ceiling from kratos (14.29\,Mbit/s to minipc, 16.58 to defalt; Table~\ref{tab:iperf}). The ceiling is
+per pair, and both receivers share one Wi-Fi channel with the source, so it is not additive.
+
+\textbf{Explaining the results with $d_\mathrm{nodal}$.} For the full 100\,MiB transfers,
+$d_\mathrm{trans}$ dominates: 104.9\,MB at about 1\,MB/s takes about 100\,s, while a round trip is tens
+of milliseconds. The Wi-Fi channel is the bottleneck, and queueing behind it ($d_\mathrm{queue}$)
+explains the large run-to-run spread. For delta sync and CDC after an insert, only 75\,667 and 66\,594
+chunk bytes cross the network, so $d_\mathrm{trans}$ almost disappears (every run but one under 1.4\,s) and the
+remaining time is a few request/reply round trips plus our own $d_\mathrm{proc}$ (hashing, index
+compare). 5\,\% loss makes the transfer 4.1 times slower: lost segments must be retransmitted and TCP
+shrinks its congestion window, which shows up as extra waiting, not as distance; the same loss is
+behind the 402 retransmissions in Section~\ref{sec:failure}. Adding 50\,ms of delay, a
+$d_\mathrm{prop}$-like term, has no clear effect ($118.8 \pm 27.1$ vs $116.4 \pm 33.6$\,s): at
+1.031\,MB/s, 50\,ms holds about 52\,KB in flight, far below what our pipelining keeps outstanding
+(8 outstanding CHUNK\_REQs per peer $\times$ 64\,KiB average chunk, about 524\,KB), so the link stays busy. Two
+sources instead of one give no clear gain ($66.1 \pm 10.2$ vs $73.3 \pm 30.9$\,s): the sources share
+the same air time, so the bottleneck does not move. TLS shows no measurable cost: its throughput
+($1.23 \pm 0.29$\,MB/s) and setup time ($0.25 \pm 0.05$\,s) are within the spread of plain mode
+($1.06 \pm 0.17$\,MB/s, $0.65 \pm 1.08$\,s), because encryption adds a little $d_\mathrm{proc}$ on a link
+whose $d_\mathrm{trans}$ is far larger.
+% 104874436 B / 1.031e6 B/s = 102 s; 474.2 / 116.4 = 4.07; 1.031e6 x 0.05 = 51,550 B;
+% MAX_OUTSTANDING_PER_PEER 8 x CDC_AVG 64 KiB = 524,288 B (constants.py); 1.031 MB/s x 8 = 8.25
+% Mbit/s; 8.25/14.29 = 0.58, 8.25/16.58 = 0.50. Per-run values: data/<experiment>/run*.csv.
+
+\textbf{Anomalies.} (1) The same 100\,MiB operation took $227.5 \pm 75.0$\,s in condition 1,
+$143.1 \pm 49.6$\,s in condition 2 and $102.9 \pm 16.8$\,s in condition 6: a factor of two between blocks
+of one batch. defalt's Wi-Fi was lossy during the batch (25--83\,\% ping loss from kratos) and its power
+saving was turned off part-way, so link quality changed over time; byte counts did not. (2) Delta's
+standard deviation exceeds its mean ($5.2 \pm 10.9$\,s) because run 4 took 21.7 and 27.8\,s on the two
+receivers while every other run took under 1\,s; the CSVs do not show the cause. (3) Plain mode's
+setup time ($0.65 \pm 1.08$\,s) comes from one 5.075\,s value (run 5, minipc); the other nine are
+0.045--0.364\,s. (4) TLS received more chunk bytes than the file size: besides the excluded run 4,
+defalt in run 5 received 107\,665\,543 bytes, a duplicate fetch (\#60) that \code{analyze.py} does not
+flag. (5) TLS was not slower than plain; on this network the difference is inside the spread.
+% data/README.md (lossy defalt, power saving); data/full_delta/run4.csv (delta 21.706522,
+% 27.767192 s); data/tls/run5.csv (plain minipc setup_s 5.075; tls defalt chunk_bytes 107665543).
+
+\textbf{Limitations.} All runs used one Wi-Fi network whose quality changed during the batch, so
+time differences smaller than the spread mean ``no clear effect''. n = 5 runs gives wide intervals,
+and two receivers are averaged per run. Times are measured on each receiver from the first
+NOTIFY with a 0.5\,s polling step, so sub-second values are coarse. The chunk-size condition and
+Wi-Fi vs wired were not run. Host clocks differ (kratos logs are 5\,h ahead), which is why we never
+compare times across hosts. The captures in Section~\ref{sec:capture} keep only 256 bytes per
+frame, so they give counts and headers, not payload timings.
+% data/README.md; data/<experiment>/run*.csv (e2e_from first_notify, poll_s 0.5);
+% data/captures/README.md (snaplen 256, kratos clock).

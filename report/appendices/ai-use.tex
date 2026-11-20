@@ -1,65 +1,58 @@
 % !TEX root = ../main.tex
 % AI-use declaration: not counted in the page limit (PROJECT_CONTEXT.md §16).
-% Generated from docs/AI_USE_LOG.md, one row per log row; cells are copied as logged.
-% Empty or placeholder cells in the log are shown as TODO: fix them in the log, then update
-% this table. Keep it in sync with the log before submission.
+% Summary of docs/AI_USE_LOG.md by area of work (Ahmed's choice on #75, 2026-11-20); the complete,
+% dated log stays in the repository. Hand-written from the log: update it when the log changes.
+% Counts and models as logged on 2026-11-20 (46 entries, including the one for this appendix).
 \section{AI-use declaration}
 \label{app:ai-use}
 
-All AI assistance used in this project is listed below, from \code{docs/AI\_USE\_LOG.md}.
-Every member reviewed and can explain AI-assisted work before it was merged.
+We used one AI tool, Claude Code (Anthropic), with the Claude Opus~5.5 model and, for three
+networking entries, Claude Sonnet~5.5; seven early entries do not record the model.
+Table~\ref{tab:ai-use} summarises which parts of the work it was used for. The complete, dated
+log, one entry per piece of work with what was kept or changed, is \code{docs/AI\_USE\_LOG.md}
+in the repository (Appendix~\ref{app:code}). Under our rules (\code{AGENTS.md} §10), the AI must
+post a plan for the member's approval before writing, must not invent protocol values or measured
+numbers, and must never approve or merge; changes are merged only through a pull request with CI
+and a review by another member.
+% docs/AI_USE_LOG.md (tool column: Opus 5.5; Sonnet 5.5 for #2, #3, #40; no model for the #27,
+% #28, #29, #31, #6, #1, #4 entries); AGENTS.md §7 (R-7.3, R-7.4), §10.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.12\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.15\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.16\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.32\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.25\linewidth-2\tabcolsep\relax}}
-\caption{AI use: tool, model, purpose and outcome.}\label{tab:ai-use}\\
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.19\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.18\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.13\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.50\linewidth-2\tabcolsep\relax}}
+\caption{AI use by area of work (46 log entries).}\label{tab:ai-use}\\
 \toprule
-\colhead{Date} & \colhead{Member} & \colhead{Tool (model)} & \colhead{Used for} & \colhead{Kept / changed} \\
+\colhead{Area} & \colhead{Issues} & \colhead{Member} & \colhead{What the AI was used for} \\
 \midrule
 \endfirsthead
-\multicolumn{5}{@{}l}{\tablecontinued}\\
+\multicolumn{4}{@{}l}{\tablecontinued}\\
 \toprule
-\colhead{Date} & \colhead{Member} & \colhead{Tool (model)} & \colhead{Used for} & \colhead{Kept / changed} \\
+\colhead{Area} & \colhead{Issues} & \colhead{Member} & \colhead{What the AI was used for} \\
 \midrule
 \endhead
 \bottomrule
 \endlastfoot
-  2026-11-02 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & Repository scaffold from the scaffold brief: pyproject, CI, PR template, PROTOCOL.md, constants.py, framing.py + unit tests, module stubs, CLI skeleton, gen\_certs.sh & Kept as generated; to be reviewed line by line by another member before merge (PR \#27) \\
-  2026-11-02 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & GitHub setup guide (docs/setup/github.md), CODEOWNERS, CONTRIBUTING.md from the team settings brief & Kept as generated; to be reviewed by another member before merge (PR \#28) \\
-  2026-11-02 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & AGENTS.md rulebook, CLAUDE.md, folder READMEs, FROZEN INTERFACE headers, scripts/check.sh, CONTRIBUTING.md, PR template (\#29) & Draft reviewed and adjusted by Ahmed (branch names, PR size rule); to be reviewed by another member before merge \\
-  2026-11-07 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & TLS contexts (\#5): net/tls.py, tests/unit/test\_tls.py, PROTOCOL.md §6, README & \TODO{outcome missing in log} \\
-  2026-11-07 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & messages.py scaffold + tests (\#31) & Reviewed messages.py and tests line by line; decided review round 1 (decision label (c), tombstone shape (f), kept branch name); fixes from Mujtaba's review (RecursionError, path control chars, allow\_nan, hex case (d)) applied via Claude \\
-  2026-11-07 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & CLI + config (\#6): config.py, \_\_main\_\_.py, tests/unit/test\_config.py, README config example & \TODO{outcome missing in log} \\
-  2026-11-07 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & UDP discovery (\#1): net/discovery.py, tests/unit/test\_discovery.py, PROTOCOL.md §2 drop rules & \TODO{outcome is a placeholder in log} \\
-  2026-11-07 & Muhammad Ahmed Qazi & Claude Code (\TODO{model missing in log}) & HMAC handshake (net/auth.py, tests, PROTOCOL.md decision g) (\#4) & \TODO{outcome missing in log} \\
-  2026-11-07 & Muhammad Ahmed Qazi & Claude Code (Sonnet 5.5) & Connection (\#2): net/connection.py, tests/unit/test\_connection.py, tests/conftest.py (shared cert fixtures), PeerIdentity dedupe, PROTOCOL.md §3/§6/§7 + decisions (h), (i) & \TODO{outcome missing in log} \\
-  2026-11-07 & Muhammad Ahmed Qazi & Claude Code (Sonnet 5.5) & PeerManager (\#3): net/manager.py, tests/unit/test\_manager.py, PROTOCOL.md §8a + decision (j) & \TODO{outcome missing in log} \\
-  2026-11-08 & Muhammad Ahmed Qazi & Claude Code (Sonnet 5.5) & node wiring (\#40): node.py, \_\_main\_\_ run, tests/fakes.py, tests/unit/test\_node.py, PROTOCOL.md §8b + decisions (k), (l) & \TODO{outcome missing in log} \\
-  2026-11-08 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & local mesh script (\#7): scripts/run\_local\_mesh.sh, .gitignore, README local testing & \TODO{outcome missing in log} \\
-  2026-11-08 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & PROTOCOL.md consolidation (\#8): rewrite as one spec, worked examples generated from the code & \TODO{outcome missing in log} \\
-  2026-11-08 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & version vectors (\#13): sync/vclock.py, tests/unit/test\_vclock.py & \TODO{outcome missing in log} \\
-  2026-11-08 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & chunk store (\#11): sync/store.py, tests/unit/test\_store.py & \TODO{outcome missing in log} \\
-  2026-11-10 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & chunker (\#9): sync/chunker.py, tests/unit/test\_chunker.py & \TODO{outcome missing in log} \\
-  2026-11-10 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & local index (\#10): sync/index.py, tests/unit/test\_index.py & \TODO{outcome missing in log} \\
-  2026-11-11 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & conflict fetch before apply (\#49): node.py, tests/fakes.py, tests/unit/test\_node.py & \TODO{outcome missing in log} \\
-  2026-11-10 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & polling scanner (\#12): sync/scanner.py, tests/unit/test\_scanner.py & \TODO{outcome missing in log} \\
-  2026-11-11 & Huzaifa Hanif & Claude Code (Opus 5.5) & file assembler (\#16): transfer/assembler.py, tests/unit/test\_assembler.py & \TODO{outcome missing in log} \\
-  2026-11-11 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & persisted scan cache (\#51): sync/scanner.py, tests/unit/test\_scanner.py & \TODO{outcome missing in log} \\
-  2026-11-11 & Huzaifa Hanif & Claude Code (Opus 5.5) & chunk scheduler (\#15): transfer/scheduler.py, tests/unit/test\_scheduler.py & \TODO{outcome missing in log} \\
-  2026-11-11 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & sync engine (\#14): sync/engine.py, tests/unit/test\_engine.py, build\_node on\_change line, PROTOCOL.md §9.4 conflict rules & \TODO{outcome missing in log} \\
-  2026-11-11 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & netem profiles (\#18): scripts/netem.sh, tests/unit/test\_netem.py & \TODO{outcome missing in log} \\
-  2026-11-11 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & test data generator (\#19): scripts/gen\_testdata.py, tests/unit/test\_gen\_testdata.py; data set proposal on \#25 & \TODO{outcome missing in log} \\
-  2026-11-11 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & per-message metrics logger (\#17): metrics/logger.py, record calls in net/connection.py, tests/unit/test\_logger.py, test\_connection.py & \TODO{outcome missing in log} \\
-  2026-11-12 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & integration tests (\#62): tests/integration/\{mesh.py,conftest.py,test\_sync.py,README.md\}, integration marker in pyproject.toml & \TODO{outcome missing in log} \\
-  2026-11-12 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & §10 failure-scenario integration tests (\#63): tests/integration/test\_failures.py, mesh.py additions (kill, wait\_log, per-peer secret/cert dir/plain), README & \TODO{outcome missing in log} \\
-  2026-11-12 & Huzaifa Hanif & Claude Code (Opus 5.5) & measurement runner, §11 conditions 1-3 (\#20): scripts/measure/run.py, peer.py, tests/unit/test\_measure.py & \TODO{outcome missing in log} \\
-  2026-11-12 & Huzaifa Hanif & Claude Code (Opus 5.5) & dedupe concurrent fetches (\#60): transfer/scheduler.py, tests/unit/test\_scheduler.py & \TODO{outcome missing in log} \\
-  2026-11-12 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & §11 conditions 5-6 runners (\#69): impaired and tls experiments, setup\_s column, netem helpers in scripts/measure/run.py; tests in tests/unit/test\_measure.py; README & \TODO{outcome missing in log} \\
-  2026-11-12 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & analysis script (\#71): analysis/analyze.py (tables, mean ± sd, §13 savings, matplotlib graphs), tests/unit/test\_analyze.py, analysis extra in pyproject.toml, README & \TODO{outcome missing in log} \\
-  2026-11-14 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & network baseline (\#70): scripts/measure/baseline.\{sh,py\}, tests/unit/test\_baseline.py, step-by-step commands for the 3-host session, data/baseline/README.md written from the measured data, reuse-vs-reconnect derivation & \TODO{outcome missing in log} \\
-  2026-11-12 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & 3-host deployment session (\#67): step-by-step commands for the run, data/deploy/README.md written from the captured logs and host info; redaction of hostname, user name and MACs & \TODO{outcome missing in log} \\
-  2026-11-14 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & captures (\#68): scripts/measure/anon\_mac.py + tests, step-by-step capture commands, tshark analysis of the captures, data/captures/README.md (annotated packets, overhead, R7 evidence) & \TODO{outcome missing in log} \\
-  2026-11-14 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & \texttt{meshsync run --metrics-csv PATH} / \texttt{metrics\_csv} key (\#72): \_\_main\_\_.py, config.py, tests/unit/test\_config.py, README config section & Kept; design decided by Ahmed on \#72, plan approved before code; pending review by Mujtaba \\
-  2026-11-15 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & \texttt{meshsync status} / \texttt{meshsync stats} (\#64): new src/meshsync/status.py (status-file writer/reader, CSV summariser), node.py hooks, \_\_main\_\_.py subcommands, tests/unit/test\_status.py, status tests in test\_node.py, integration status test, README & Kept; decisions posted on \#64 by Ahmed, threshold (5 x SCAN\_INTERVAL) and module placement approved before code; pending review by Mujtaba \\
-  2026-11-15 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & report skeleton (\#73): report/main.tex, report/preamble.tex (style adapted from the team's CS-326 SRS), report/sections/, report/appendices/ (AI-use table generated from this log), report/README.md (format rules, page budget, build, submission checklist), .gitignore & Format (LaTeX) and plan decided by Ahmed before code; to be checked by Ahmed in Tectonic before the PR; pending review by Mujtaba \\
-  2026-11-15 & Mujtaba Jawaid Rao & Claude Code (Opus 5.5) & Wireshark dissector (\#82): tools/wireshark/\{meshsync.lua,decode.sh,README.md\}, tests/unit/test\_wireshark\_dissector.py, CODEOWNERS line; tested with tshark 4.2 on the \#68 captures and a full-size local capture & \TODO{outcome missing in log} \\
-  2026-11-15 & Muhammad Ahmed Qazi & Claude Code (Opus 5.5) & report §2–§4 (\#74): report/sections/02-protocol.tex (condensed R1 spec from PROTOCOL.md), 03-architecture.tex (IP plan, host config, run evidence from data/deploy/), 04-implementation.tex (R2, R4 table), docs/diagrams/network-g2.tex (TikZ network diagram), tikz in report/preamble.tex, page budget in report/README.md & Plan, page budget (§2 2.5, §3 1.25, §4 1), TikZ and the no-MAC rule decided by Ahmed before writing; built locally with XeLaTeX to measure pages; review fixes (port-0 note, ILLEGAL\_STATE row, measured pages in README) after Mujtaba's review; trimming deferred by Ahmed \\
+Repository setup and rules & \#27--\#29 (PRs), \#7, \#8 & Ahmed
+  & Project scaffold, CI, PR template, GitHub setup guide, the \code{AGENTS.md} rulebook, the
+    local-mesh script, and consolidating \code{PROTOCOL.md} into one specification. \\
+Protocol and networking & \#1--\#6, \#31, \#40, \#49, \#64, \#72 & Ahmed
+  & Message validation, discovery, HMAC handshake, TLS contexts, connections, peer manager, node
+    wiring, the CLI and its \code{status}/\code{stats}/metrics options, with unit tests. \\
+Sync & \#9--\#14, \#51 & Mujtaba
+  & Chunker, chunk store, index, polling scanner and its cache, version vectors and the sync
+    engine, with unit tests. \\
+Transfer and metrics & \#15--\#17, \#60 & Huzaifa, Mujtaba
+  & Chunk scheduler and its duplicate-fetch fix, file assembler, per-message metrics logger. \\
+Testing and measurement tools & \#18--\#20, \#62, \#63, \#69--\#71, \#77 & Mujtaba, Huzaifa
+  & Localhost integration and failure-scenario tests, netem profiles, test-data generator,
+    single- and multi-host experiment runners, baseline scripts, the analysis script. \\
+Measurement sessions & \#67, \#68, \#70, \#77 & Mujtaba
+  & Step-by-step commands for the 3-host deployment, captures, baseline and §11 batch, and the
+    data READMEs written from the recorded results (MACs and user names redacted). \\
+Wireshark dissector & \#82 & Mujtaba
+  & The Lua dissector and its decode script for the captures. \\
+Report & \#73--\#75 & Ahmed
+  & LaTeX skeleton and style; drafting §1--§9 and this appendix from the repository's specification, data and
+    captures. Format, structure, page budget and the cited energy figure were decided or
+    checked by Ahmed. \\
 \end{reptable}
+% Area grouping and issue numbers from the log's "Used for" column; members from its "Member"
+% column (Huzaifa: #15, #16, #20, #60; Mujtaba: #17 and the rest).
