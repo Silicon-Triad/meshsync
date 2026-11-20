@@ -17,7 +17,7 @@ Rules: [`AGENTS.md`](../AGENTS.md).
 | `sections/01-…10-*.tex` | One file per counted section, in the order the brief requires |
 | `sections/11-references.tex` | References (not counted) |
 | `appendices/code.tex` | Code appendix: repo link and commit hash (not counted) |
-| `appendices/ai-use.tex` | AI-use declaration, from `docs/AI_USE_LOG.md` |
+| `appendices/ai-use.tex` | AI-use declaration: summary of `docs/AI_USE_LOG.md` by area of work |
 | `figures/` | Figures made for the report (diagrams also load from `docs/diagrams/`, graphs from `analysis/out/`) |
 | `rubric.pdf` | The filled-in rubric; **not committed** (gitignored), we attach it ourselves |
 
@@ -120,10 +120,11 @@ Build outputs (PDF, aux, log, …) are gitignored; never commit them.
 
 ## Updating the AI-use appendix
 
-`appendices/ai-use.tex` has one row per row of `docs/AI_USE_LOG.md`. Empty or placeholder
-cells in the log appear as `TODO`: fix them in the log (the member who did the work), then
-update the matching row here. Rows added to the log later (for example #74, #75) must be added
-here before submission.
+`appendices/ai-use.tex` summarises `docs/AI_USE_LOG.md` by area of work (one row per area, with
+issues, members, tool and model); the complete log stays in the repository and the appendix
+points to it. It is written by hand: when the log gains entries, update the issue lists, the
+entry count and the model note. Empty or placeholder cells in the log must be fixed in the log
+itself (the member who did the work).
 
 ## Submission checklist
 
