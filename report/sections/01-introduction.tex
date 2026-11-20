@@ -1,11 +1,30 @@
 % !TEX root = ../main.tex
 % Section 1. Suggested page budget: 1 page (suggestion only; README.md has the full table).
-% Filled by: not assigned to #74/#75 yet (PROJECT_CONTEXT.md §3: "All": intro).
+% Filled by: #75 PR (Ahmed's decision, 2026-11-20).
 % Sources: PROJECT_CONTEXT.md §1 (summary), §2 (requirements, deviations), §5 (improvements).
 \section{Introduction and the option selected}
 \label{sec:intro}
 
-\TODO{project summary and the option selected (team; PROJECT\_CONTEXT.md §1, §5).}
+meshsync keeps one shared folder identical on three Linux hosts without a central server. A
+file created, edited or deleted on one host reaches the others within seconds; every host runs the
+same program as an equal peer (D6). We built it as a custom option that extends Option~E, using
+our own application-layer protocol directly on sockets: UDP broadcast to discover peers and TCP for
+everything else (Sections~\ref{sec:protocol} and~\ref{sec:implementation}).
+% PROJECT_CONTEXT.md §1 (summary), §2 (option), §4 D6.
+
+The main features are: chunk-level delta sync, where only missing chunks travel and each is
+verified by SHA-256; download of chunks from several peers in parallel; version vectors that detect
+concurrent edits and keep both copies; and an HMAC challenge-response with an optional TLS~1.3
+mode. Each addresses a gap in an existing protocol: FTP sends credentials in plain text, while our
+secret never crosses the wire; HTTP/1.1 answers pipelined requests in order, while our REQ\_ID lets
+replies arrive in any order on one connection; rsync connects two hosts once, while we keep a
+multi-peer mesh in continuous sync; fixed-size blocks re-send everything after an insert near the
+start, while content-defined chunking (D10) does not; and mDNS-style discovery can be spoofed, while
+our ANNOUNCEs carry an HMAC tag (D11). Sections~\ref{sec:capture}--\ref{sec:failure} give the
+evidence: the capture, the measurements, the design tensions, the sustainability estimate and the
+behaviour under failure.
+% PROJECT_CONTEXT.md §1 (core features), §5 (improvements table: FTP, HTTP/1.1, rsync,
+% fixed-block sync, mDNS/SSDP rows).
 
 \paragraph{Approved deviations.} The following deviations were stated in our proposal and
 approved (PROJECT\_CONTEXT.md §2, quoted verbatim):
