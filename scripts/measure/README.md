@@ -62,3 +62,10 @@ scripts/measure/run.py all --runs 5
   (`scripts/gen_testdata.py testdata --sets A,D`; checked by SHA-256 before a run). Turn the
   mini PC's Wi-Fi power saving off for these runs (#83). Raw per-host CSVs and logs:
   `data/raw/hosts/` (gitignored).
+- **Unattended batches (#77):** set up SSH keys first (`ssh-copy-id user@host` for each remote
+  host); the driver warns at start-up if a host still asks for a password, because a dropped
+  connection would then wait for one. SSH heartbeats (15 s) detect a dead link, and read-only
+  polls, stopping peers and copying results retry an SSH failure 3 times. A run that still
+  fails is skipped; afterwards `hosts.py EXPERIMENT ... --resume` runs only the missing
+  `run<k>.csv` files and never clears the existing ones. `data/<experiment>/runs.log` records
+  when each run was measured, so runs redone on another day are visible.

@@ -56,7 +56,12 @@ from meshsync.protocol.constants import META_DIR, TCP_PORT, UDP_PORT  # noqa: E4
 log = logging.getLogger("measure.hosts")
 
 SSH_OPTS = ["-o", "ControlMaster=auto", "-o", "ControlPath=~/.ssh/cm-hosts-%r@%h:%p",
-            "-o", "ControlPersist=30m"]  # fmt: skip
+            "-o", "ControlPersist=30m",
+            # Detect a dead link in about a minute instead of hanging (real batch, #77).
+            "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=4"]  # fmt: skip
+SSH_FAIL = 255  # ssh's own exit status: connection failed, not the remote command
+SSH_RETRIES = 3  # harness: extra attempts for a read-only remote command after an SSH failure
+SSH_RETRY_WAIT_S = 3  # harness: seconds between those attempts
 STOP_WAIT_S = 10  # harness: seconds a peer gets to exit after SIGINT before SIGKILL
 SUDO_KEEPALIVE_S = 60  # harness: refresh cached sudo well inside sudo's default 5 min timeout
 _SYNCED_RE = re.compile(r"connection to (\S+) is SYNCED")
@@ -96,8 +101,19 @@ def shell_argv(host: Host, script: str) -> list[str]:
     return ["ssh", *SSH_OPTS, host.target, "bash -c " + shlex.quote(script)]
 
 
-def sh(host: Host, script: str, check: bool = True) -> str:
-    r = subprocess.run(shell_argv(host, script), capture_output=True, text=True)
+def sh(host: Host, script: str, check: bool = True, retry: bool = False) -> str:
+    """Run script on host. retry=True is only for scripts that are safe to send twice:
+    read-only ones (polls, hashes, clock reads) and idempotent ones (killing a peer, removing
+    its folder). They are re-sent when SSH itself fails (exit 255, e.g. the shared connection
+    dropped on a Wi-Fi blip). Starting a peer never retries.
+    """
+    for attempt in range(SSH_RETRIES + 1 if retry and not host.local else 1):
+        r = subprocess.run(shell_argv(host, script), capture_output=True, text=True)
+        if r.returncode != SSH_FAIL or host.local:
+            break
+        log.warning("%s: SSH failed (%s); retry %d/%d", host.name, r.stderr.strip()[-120:],
+                    attempt + 1, SSH_RETRIES)  # fmt: skip
+        time.sleep(SSH_RETRY_WAIT_S)
     if check and r.returncode != 0:
         raise RuntimeError(f"{host.name}: {script!r} failed: {r.stderr.strip()}")
     return r.stdout
@@ -115,9 +131,17 @@ def fetch(host: Host, remote: str, local: Path) -> None:
     if host.local:
         if Path(remote).resolve() != local.resolve():
             shutil.copyfile(remote, local)
-    else:
-        subprocess.run(["scp", "-q", *SSH_OPTS, f"{host.target}:{remote}", str(local)],
-                       check=True)  # fmt: skip
+    else:  # copying is read-only on the host, so a dropped connection is simply retried
+        cmd = ["scp", "-q", *SSH_OPTS, f"{host.target}:{remote}", str(local)]
+        for attempt in range(SSH_RETRIES + 1):
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            if r.returncode == 0:
+                return
+            if attempt < SSH_RETRIES:
+                log.warning("%s: scp failed (%s); retry %d/%d", host.name,
+                            r.stderr.strip()[-120:], attempt + 1, SSH_RETRIES)  # fmt: skip
+                time.sleep(SSH_RETRY_WAIT_S)
+        raise subprocess.CalledProcessError(r.returncode, cmd, r.stdout, r.stderr)
 
 
 def parse_synced(log_text: str) -> set[str]:
@@ -175,7 +199,9 @@ class HostMesh:
         return float(sh(h, self.start_script(h)).split()[0])
 
     def log_text(self, h: Host) -> str:
-        return sh(h, f"cat {shlex.quote(self.base(h) + '/peer.log')} 2>/dev/null || true")
+        return sh(
+            h, f"cat {shlex.quote(self.base(h) + '/peer.log')} 2>/dev/null || true", retry=True
+        )
 
     def wait(self, cond: Callable[[], bool], what: str) -> None:
         end = time.monotonic() + self.args.timeout
@@ -209,7 +235,7 @@ class HostMesh:
         )
 
     def stat(self, h: Host) -> tuple[int, int, float] | None:
-        return parse_stat(sh(h, self.poll_script(h)))
+        return parse_stat(sh(h, self.poll_script(h), retry=True))
 
     def wait_files(self, receivers: list[Host], size: int,
                    before: dict[str, int | None]) -> dict[str, float]:  # fmt: skip
@@ -230,7 +256,7 @@ class HostMesh:
         return done
 
     def sha(self, h: Host, path: str) -> str:
-        return sh(h, f"sha256sum {shlex.quote(path)}").split()[0]
+        return sh(h, f"sha256sum {shlex.quote(path)}", retry=True).split()[0]
 
     def verify(self, receivers: list[Host], sha: str) -> None:
         for h in receivers:
@@ -240,7 +266,7 @@ class HostMesh:
 
     def indexed(self, h: Host, sha: str) -> bool:
         idx = shlex.quote(f"{self.data(h)}/{META_DIR}/index.json")
-        out = sh(h, f"cat {idx} 2>/dev/null || true")
+        out = sh(h, f"cat {idx} 2>/dev/null || true", retry=True)
         try:
             entries = json.loads(out).get("entries", [])
         except ValueError:
@@ -249,11 +275,12 @@ class HostMesh:
 
     def stop(self) -> None:
         """SIGINT every peer (clean BYE), SIGKILL after STOP_WAIT_S; then collect raw files."""
-        for h in self.hosts:
+        for h in self.hosts:  # retried: an orphan peer would keep holding the TCP port
             pid = shlex.quote(f"{self.base(h)}/pid")
             sh(h, f"p=$(cat {pid} 2>/dev/null) || exit 0; kill -INT $p 2>/dev/null; "
                   f"for i in $(seq {STOP_WAIT_S * 10}); do kill -0 $p 2>/dev/null || exit 0; "
-                  "sleep 0.1; done; kill -9 $p 2>/dev/null; true", check=False)  # fmt: skip
+                  "sleep 0.1; done; kill -9 $p 2>/dev/null; true",
+               check=False, retry=True)  # fmt: skip
         for h in self.hosts:
             for name in ("metrics.csv", "peer.log"):
                 try:
@@ -261,7 +288,7 @@ class HostMesh:
                 except (subprocess.CalledProcessError, FileNotFoundError) as e:
                     log.warning("%s: could not collect %s: %s", h.name, name, e)
             if not self.args.keep_data:
-                sh(h, f"rm -rf {shlex.quote(self.data(h))}", check=False)
+                sh(h, f"rm -rf {shlex.quote(self.data(h))}", check=False, retry=True)
 
     def metrics(self, h: Host) -> list[mr.Msg]:
         return mr.read_metrics(self.raw / h.name / "metrics.csv")
@@ -355,7 +382,8 @@ def measure(mesh: HostMesh, step: mr.Step, src: Host, receivers: list[Host],
     for h in receivers:
         st = mesh.stat(h)
         before[h.name] = st[0] if st else None
-        r_t0[h.name] = float(sh(h, "python3 -c 'import time; print(time.time())'").split()[0])
+        now = sh(h, "python3 -c 'import time; print(time.time())'", retry=True)
+        r_t0[h.name] = float(now.split()[0])
     s_t0 = mesh.place(src, step.file)
     done = mesh.wait_files(receivers, size, before)
     mesh.verify(receivers, manifest[step.file])
@@ -535,6 +563,35 @@ EXPERIMENTS = {
 # ---------------------------------------------------------------- main
 
 
+def needs_password(host: Host) -> bool:
+    """True if a fresh SSH login to host would stop to ask for a password (no key set up)."""
+    if host.local:
+        return False
+    r = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ControlPath=none",
+                        "-o", "ConnectTimeout=10", host.target, "true"],
+                       capture_output=True)  # fmt: skip
+    return r.returncode != 0
+
+
+RUNS_LOG = "runs.log"
+
+
+def log_run(folder: Path, run: int, start: float, end: float) -> None:
+    """Append when a run was measured, so runs redone by --resume on another day are visible."""
+    fmt = "%Y-%m-%d %H:%M:%S %z"
+    folder.mkdir(parents=True, exist_ok=True)
+    with (folder / RUNS_LOG).open("a") as f:
+        f.write(f"run{run} {time.strftime(fmt, time.localtime(start))} "
+                f"{time.strftime(fmt, time.localtime(end))}\n")  # fmt: skip
+
+
+def runs_to_do(folder: Path, runs: int, resume: bool) -> list[int]:
+    """Run numbers to execute: all of 1..runs, or with --resume only those without a CSV."""
+    if not resume:
+        return list(range(1, runs + 1))
+    return [k for k in range(1, runs + 1) if not (folder / f"run{k}.csv").exists()]
+
+
 def check_testdata(hosts: list[Host], args: argparse.Namespace,
                    manifest: dict[str, str]) -> None:  # fmt: skip
     """Every host's copy of the files a run places must match the driver's manifest."""
@@ -565,6 +622,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--poll", type=float, default=0.5, help="seconds between checks (harness)")
     p.add_argument("--keep-data", action="store_true", help="keep the hosts' sync folders")
     p.add_argument("--retries", type=int, default=3, help="extra attempts for a 2src run")
+    p.add_argument(
+        "--resume",
+        action="store_true",
+        help="keep existing data/<experiment>/run<k>.csv; run only the missing ones",
+    )
     p.add_argument("--iface", default="wlp2s0", help="source interface netem impairs (cond. 5)")
     p.add_argument("--loss-pct", type=float, default=mr.LOSS_PCT_DEFAULT,
                    help="condition 5 loss %% (default 5, §10)")  # fmt: skip
@@ -589,14 +651,28 @@ def main(argv: list[str] | None = None) -> int:
         stop = threading.Event()  # ... and keep it cached for the whole batch
         threading.Thread(target=keep_sudo_alive, args=(stop,), daemon=True).start()
     for h in hosts:
+        if needs_password(h):
+            log.warning(
+                "%s asks for an SSH password: a dropped connection mid-batch will wait "
+                "for it. For unattended runs set up a key: ssh-copy-id %s",
+                h.name,
+                h.target,
+            )
+    for h in hosts:
         resolve(h, args.remote_repo)
     check_testdata(hosts, args, manifest)
     sizes = {rel: (args.testdata / rel).stat().st_size for rel in (mr.A, mr.OVERWRITE, mr.INSERT)}
 
     failed: list[str] = []
     for name in names:
-        mr.clear_runs(args.data / name)
-        for run in range(1, args.runs + 1):
+        if not args.resume:
+            mr.clear_runs(args.data / name)
+            (args.data / name / RUNS_LOG).unlink(missing_ok=True)
+        todo = runs_to_do(args.data / name, args.runs, args.resume)
+        if args.resume:
+            log.info("%s: runs to do %s", name, todo or "none")
+        for run in todo:
+            start = time.time()
             try:
                 rows = EXPERIMENTS[name](run, hosts, args, manifest, sizes)
             except Exception:  # noqa: BLE001 - one bad run must not lose the rest of the batch
@@ -605,6 +681,7 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             out = args.data / name / f"run{run}.csv"
             mr.write_rows(out, rows)
+            log_run(args.data / name, run, start, time.time())
             log.info("wrote %s", out)
     if failed:
         log.error("%d run(s) failed: %s", len(failed), ", ".join(failed))
