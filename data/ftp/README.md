@@ -24,19 +24,36 @@ Rules: [`AGENTS.md`](../../AGENTS.md).
 
 | Variant | Transfer time (s) | Bytes downloaded | meshsync, same edit (`data/`) |
 | ------- | ----------------- | ---------------- | ----------------------------- |
-| full | 106.5 ± 32.5 | 104,857,600 | `impaired` clean 116.4 ± 33.6 s, 104,874,436 chunk bytes |
+| full | 106.5 ± 32.5 | 104,857,600 | same night: clean 162.8 ± 14.0 s, 104,874,436 chunk bytes |
 | overwrite (1 KiB) | 88.5 ± 17.3 | **104,857,600** (whole file) | `full_delta` delta: **75,667** chunk bytes, 5.2 ± 10.9 s |
 | insert (1 KiB at 0) | 87.8 ± 33.4 | **104,858,624** (whole file) | `fixed_cdc` cdc: **66,594** chunk bytes, 0.30 ± 0.41 s |
-| loss (5 %) | 248.9 ± 56.2 | 104,857,600 | `impaired` loss 474.2 ± 143.7 s (another night, see below) |
+| loss (5 %) | 248.9 ± 56.2 | 104,857,600 | same night: loss 346.3 ± 59.0 s |
+
+### meshsync on the same night (`meshsync_same_night/`)
+
+To compare times fairly, meshsync's condition 5 (`hosts.py impaired`, same 3 hosts, same file)
+ran right after the FTP batch (2026-11-21 23:59 to 2026-11-22 01:23, `meshsync_same_night/runs.log`;
+FTP: 22:16 to 23:32). These files sit in a subfolder so `analyze.py` does not mix them with
+`data/impaired/` from the main batch.
+
+| Condition | meshsync, same night | meshsync, main batch (`data/impaired`) | FTP, same night |
+| --------- | -------------------- | -------------------------------------- | --------------- |
+| clean / full | 162.8 ± 14.0 s | 116.4 ± 33.6 s | 106.5 ± 32.5 s |
+| 5 % loss | 346.3 ± 59.0 s | 474.2 ± 143.7 s | 248.9 ± 56.2 s |
+| loss ÷ clean | **2.1×** | 4.1× | **2.3×** |
+| 50 ms delay | 148.4 ± 45.5 s (0.9×) | 118.8 ± 27.1 s (1.0×) | not measured |
 
 - **After a small edit FTP downloads the whole file again**: about 1,386× (overwrite) and
   1,575× (insert) the bytes meshsync sent. FTP has no delta transfer.
-- **A fresh full copy is about as fast with FTP as with meshsync** (one plain TCP stream;
-  the Wi-Fi is the bottleneck for both). The meshsync advantage is after edits, in
-  authentication and in integrity, not in raw bulk speed.
-- **Loss:** FTP took 2.3× its full-copy time under 5 % loss; meshsync took 4.1× in its own
-  batch (`data/impaired`). Those meshsync runs were on 2026-11-18/19, when `defalt`'s Wi-Fi was
-  much worse (`data/README.md`), so this cross-night ratio is only indicative.
+- **A fresh full copy was faster with FTP** on the same night (106.5 s vs 162.8 s, runs about an
+  hour apart): one plain TCP stream, no chunking, hashing or per-chunk requests. The meshsync
+  advantage is after edits, in authentication and in integrity, not in raw bulk speed.
+- **Loss hurts both about equally:** on the same night meshsync took 2.1× its clean time and FTP
+  2.3×. The 4.1× of the main batch (2026-11-18/19, when `defalt`'s Wi-Fi was much worse,
+  `data/README.md`) came from that night's network, not from the protocol.
+- **Delay is still hidden** by pipelining (0.9×), as in the main batch.
+- In the meshsync runs `defalt` often fetched most chunks from `minipc` (e.g. 94 MB of 105 MB in
+  loss run 1): multi-source download, which FTP's client-server model cannot do.
 - `defalt` was 2–3× slower than `minipc` in every variant: its Wi-Fi, as in the meshsync runs.
 
 ## What the capture shows (FTP weaknesses from §5)
