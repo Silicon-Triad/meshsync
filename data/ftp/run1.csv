@@ -1,0 +1,9 @@
+experiment,variant,run,receiver,file,size,e2e_s,notify_s,transfer_s,chunk_msgs,chunk_bytes,recv_bytes,sent_bytes,sources,source_bytes,e2e_from,poll_s,suspect,setup_s
+ftp,full,1,minipc,large/large.bin,104857600,58.691196,,58.445980,,104857600,104857600,,1,kratos:104857600,ftp_connect,,,
+ftp,full,1,defalt,large/large.bin,104857600,135.580526,,135.375459,,104857600,104857600,,1,kratos:104857600,ftp_connect,,,
+ftp,overwrite,1,minipc,edits/overwrite.bin,104857600,48.948375,,48.726955,,104857600,104857600,,1,kratos:104857600,ftp_connect,,,
+ftp,overwrite,1,defalt,edits/overwrite.bin,104857600,109.005638,,108.821446,,104857600,104857600,,1,kratos:104857600,ftp_connect,,,
+ftp,insert,1,minipc,edits/insert.bin,104858624,34.839905,,34.759887,,104858624,104858624,,1,kratos:104858624,ftp_connect,,,
+ftp,insert,1,defalt,edits/insert.bin,104858624,79.026793,,78.933985,,104858624,104858624,,1,kratos:104858624,ftp_connect,,,
+ftp,loss,1,minipc,large/large.bin,104857600,123.978730,,123.586332,,104857600,104857600,,1,kratos:104857600,ftp_connect,,,
+ftp,loss,1,defalt,large/large.bin,104857600,208.127386,,208.017836,,104857600,104857600,,1,kratos:104857600,ftp_connect,,,
