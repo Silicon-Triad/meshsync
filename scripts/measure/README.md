@@ -2,7 +2,7 @@
 
 Experiment runners for the measurement plan (§11, R6).
 
-Owner: Huzaifa Hanif (@Huzaifa-Hanif-01). Related issues: #20, #68 (anon_mac), #69 (conditions 5-6), #70 (baseline), #77 (hosts).
+Owner: Huzaifa Hanif (@Huzaifa-Hanif-01). Related issues: #20, #68 (anon_mac), #69 (conditions 5-6), #70 (baseline), #77 (hosts), #95 (FTP baseline).
 Rules: [`AGENTS.md`](../../AGENTS.md).
 
 ```bash
@@ -69,3 +69,22 @@ scripts/measure/run.py all --runs 5
   fails is skipped; afterwards `hosts.py EXPERIMENT ... --resume` runs only the missing
   `run<k>.csv` files and never clears the existing ones. `data/<experiment>/runs.log` records
   when each run was measured, so runs redone on another day are visible.
+
+## FTP baseline (#95)
+
+`ftp_baseline.py` measures plain FTP on the same hosts, for the comparison with meshsync (§5).
+The driver machine runs an FTP server (e.g. vsftpd, set up by hand, throwaway user); every
+client downloads with Python's `ftplib`. It does not touch `src/` or the meshsync runners.
+
+```bash
+scripts/measure/ftp_baseline.py kratos:IP minipc:IP:user@IP defalt:IP:user@IP --ftp-root /srv/ftptest
+```
+
+- Variants per run: `full` (set A), `overwrite` and `insert` (set D: FTP has no delta, so the
+  whole edited file is downloaded again), `loss` (set A with netem loss on `--iface`, sudo).
+- Each client times its own download and checks the SHA-256 against the driver's manifest,
+  because FTP has no integrity check of its own. The password is read from `--pass-file` on
+  each client and is sent in plain text by FTP: use a throwaway account.
+- Output: `data/ftp/run<k>.csv` in `run.py`'s columns (`chunk_bytes` = file bytes received,
+  `e2e_from` = `ftp_connect`) plus `runs.log`; `--resume` reruns only missing runs.
+
