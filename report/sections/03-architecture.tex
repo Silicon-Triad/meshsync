@@ -8,8 +8,7 @@
 \label{sec:architecture}
 
 We ran meshsync on three separate Linux machines on one Wi-Fi LAN, 192.168.100.0/24, with the
-router at 192.168.100.1 (Figure~\ref{fig:network}, Table~\ref{tab:ip-plan}). This is the network
-we will demonstrate on. The raw evidence is in \code{data/deploy/} in the repository.
+router at 192.168.100.1 (Figure~\ref{fig:network}, Table~\ref{tab:ip-plan}), the network we will demonstrate on.
 
 \begin{figure}[!htbp]\centering
   \input{../docs/diagrams/network-g2.tex}
@@ -45,15 +44,13 @@ defalt: inet 192.168.100.80/24 brd 192.168.100.255 ... wlp4s0
 % data/deploy/<host>/host.txt ("## ip -4 addr"), host name prefixed, flags shortened to "...".
 
 \textbf{Run.} Each host ran \code{meshsync run}, first with \code{--plain} and then with
-\code{--tls}, with no static peers. So every connection was found by UDP discovery. For TLS, kratos
-made the group CA and each host's certificate. All three links reached SYNCED in both modes, for
-example on minipc:
+\code{--tls}, with no static peers, so UDP discovery found every connection. All three links reached
+SYNCED in both modes, for example on minipc:
 \begin{verbatim}
 20:27:29,272 ...auth: initiator handshake ok with defalt (BDB9C75B)
 20:27:29,273 ...manager: peer up: defalt 192.168.100.80:47001 (plain)
 20:27:29,285 ...connection: connection to defalt is SYNCED
 \end{verbatim}
-A file created on minipc, edited on defalt and deleted on kratos reached the other hosts each
-time. Over TLS, a new file had the same SHA-256 on all three.
+Creates, edits and deletes reached every host, in both modes.
 % data/deploy/minipc/plain.log (lines quoted, prefixes shortened); data/deploy/README.md
-% ("What was checked", checks 2-9).
+% ("What was checked", checks 2-9). Raw evidence: data/deploy/; TLS CA made on kratos.

@@ -2,29 +2,17 @@
 % Appendix A: quick guide to running meshsync. Commands: AGENTS.md §3, PROJECT_CONTEXT.md §14,
 % scripts/run_local_mesh.sh, scripts/gen_certs.sh. The status output in "What you should see" is
 % copied from a real run of scripts/run_local_mesh.sh -n 3 (2026-11-24); the folder path differs.
+% Trimmed to one page on 2026-11-24 (Files table dropped; Linux-only disclaimer added).
 \section[\texorpdfstring{\protect\fbox{\strut Quick Guide: Running meshsync}\protect\hspace{6pt}%
  \protect\colorbox{black}{\protect\color{white}\protect\bfseries\ START HERE\ }}{Quick Guide: Running meshsync}]{Quick Guide: Running meshsync}
 \label{app:run}
 
 meshsync runs on Linux with Python 3.11 or newer and needs no package beyond the standard library.
-All commands are run from the repository root (Appendix~\ref{app:code} gives the link and commit).
-
-\subsection{Files}
-\begin{tabularx}{\linewidth}{@{}>{\ttfamily\raggedright}p{0.36\linewidth}X@{}}
-\toprule
-\textbf{Path} & \textbf{What it is} \\
-\midrule
-src/meshsync/ & The program: \code{protocol/}, \code{net/}, \code{sync/}, \code{transfer/}, \code{metrics/} \\
-scripts/run\_local\_mesh.sh & Starts several peers on one machine for a quick test \\
-scripts/gen\_certs.sh & Makes the group CA and one certificate per peer (TLS mode) \\
-docs/PROTOCOL.md & The wire protocol the code follows \\
-\bottomrule
-\end{tabularx}
-
-\subsection{Install}
+\textbf{The whole project was built and tested on Linux machines only;} we have not tried it on
+Windows or macOS. Run all commands from the repository root (Appendix~\ref{app:code}), after
+installing:
 \begin{Verbatim}[frame=single,fontsize=\small]
 python -m venv .venv && . .venv/bin/activate && pip install -e .[dev]
-meshsync --help
 \end{Verbatim}
 
 \subsection{One machine, three peers}
@@ -55,8 +43,7 @@ Use \code{--plain} instead of \code{--tls} to run without TLS. If broadcast is b
 \code{--peer HOST:PORT} for each other laptop.
 
 \subsection{What you should see}
-\nopagebreak\code{meshsync status} on the second peer, a few seconds after \code{hello.txt} was created on the
-first (real output; only the folder path in the command differs):
+\nopagebreak\code{meshsync status} on peer2, a few seconds later (real output):
 \begin{Verbatim}[frame=single,fontsize=\small]
 running
 node     peer2 (7F44DFAD), plain, tcp 47002, udp 47000, pid 22653
