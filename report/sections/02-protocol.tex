@@ -112,16 +112,16 @@ at most 8 CHUNK\_REQs outstanding per peer and sends PING every 10\,s.
 \subsection{Legal message order}
 \label{sec:proto-order}
 
-A connection is set up in this order: TCP connect; with \code{--tls}, the TLS handshake; HELLO
-(I$\rightarrow$R), HELLO\_ACK (R$\rightarrow$I), AUTH (I$\rightarrow$R), AUTH\_OK (R$\rightarrow$I);
-then both sides send INDEX\_REQ and answer with INDEX.
-If both peers dial each other, both keep the link whose initiator has the lower \code{peer\_id}.
+Figure~\ref{fig:protocol} shows the order of messages on a new connection and the states it
+passes through. The handshake must finish within 10\,s. A valid message with no handler gets ERROR
+INTERNAL and the link stays open; a reply that matches no request is ignored. If both peers dial
+each other, both keep the link whose initiator has the lower \code{peer\_id}.
 
-A connection becomes AUTHENTICATED when AUTH\_OK is sent or received (and, with TLS, the
-certificate check passes), and SYNCED when the first INDEX arrives (or after 10\,s). It closes on a
-fatal ERROR sent or received, a BYE, a handshake not finished in 10\,s, three PINGs in a row without
-a PONG, 40\,s without any bytes, or a socket error. A valid message with no handler gets ERROR
-INTERNAL and the link stays open; a reply that matches no request is ignored.
+\begin{figure}[!htbp]\centering
+  \input{../docs/diagrams/protocol-g2.tex}
+  \caption{Connection setup (left) and connection states (right). Dashed: TLS mode only.}
+  \label{fig:protocol}
+\end{figure}
 
 \subsection{Error codes}
 \label{sec:proto-errors}

@@ -129,6 +129,19 @@ points to it. It is written by hand: when the log gains entries, update the issu
 entry count and the model note. Empty or placeholder cells in the log must be fixed in the log
 itself (the member who did the work).
 
+## Regenerating the report graphs
+
+`figures/throughput-ceiling.pdf` and `figures/ftp-bytes.pdf` come from
+`report/figures/make_figures.py` (uses `analysis/analyze.py`'s statistics on `data/`,
+`data/ftp/` and `data/baseline/summary.csv`; needs `pip install -e .[analysis]`):
+
+```bash
+report/figures/make_figures.py
+```
+
+`figures/exp-impaired.pdf` is a copy of `analysis/out/impaired.pdf` (`analysis/analyze.py`).
+The diagrams are TikZ in `docs/diagrams/` (network, protocol setup and states, encapsulation).
+
 ## Submission checklist
 
 - [ ] No `TODO` left in the PDF (search for "TODO"); `BODY PAGES` ≤ 10.

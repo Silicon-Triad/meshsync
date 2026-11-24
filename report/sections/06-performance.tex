@@ -4,7 +4,8 @@
 % #70/#83); data/<experiment>/run*.csv via analysis/analyze.py (analysis/out/*.md, #71/#77);
 % data/README.md (batch notes); data/ftp/ and data/ftp/meshsync_same_night/ via analyze.py and
 % data/ftp/README.md (#95/#96). netem: run.py LOSS_PCT_DEFAULT 5, DELAY_MS_DEFAULT 50.
-% Throughput (MB/s, analyze.py): clean 1.031, loss 0.2352, delay 0.946, plain 1.055, TLS 1.23.
+% Throughput (MB/s, analyze.py): clean 1.031, loss 0.2352, delay 0.946, plain 1.055, TLS 1.23;
+% FTP full 1.223 (x 8 = 9.8 Mbit/s); meshsync same night 0.6799.
 % TLS setup: plain 0.6517 +- 1.078 s, TLS 0.2537 +- 0.05434 s. One TLS row flagged dup (#60)
 % excluded by analyze.py; tls/run5 defalt 107,665,543 chunk bytes is not flagged.
 \section{Performance measurement, results and graphs (R6)}
@@ -52,8 +53,8 @@ five of six directions. The small extra is our own $d_\mathrm{proc}$ in Python.
 
 kratos sent a 100\,MiB file to minipc and defalt, five times per condition (18--19 November).
 For delta and CDC we then changed 1\,KiB of it. Loss and delay were added on kratos with
-\code{tc netem}. Table~\ref{tab:experiments} shows the results, and Figure~\ref{fig:exp-impaired}
-shows the effect of the link.
+\code{tc netem}. Table~\ref{tab:experiments} shows the results; Figures~\ref{fig:throughput}
+and~\ref{fig:exp-impaired} show throughput and the effect of the link.
 
 \begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.3\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.18\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.26\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.26\linewidth-2\tabcolsep\relax}}
 \caption{Experiment results, mean $\pm$ sd over n = 5 runs (100\,MiB file, two receivers).}\label{tab:experiments}\\
@@ -83,9 +84,9 @@ Security & plain & 102.9 $\pm$ 16.8 & 104\,874\,436 \\
 
 \begin{figure}[!htbp]\centering
   \begin{minipage}[t]{0.48\linewidth}\centering
-    \fitgraphic[0.25\textheight]{exp-full-delta.pdf}
-    \caption{Chunk bytes, full copy vs delta (log scale).}
-    \label{fig:exp-full-delta}
+    \fitgraphic[0.25\textheight]{throughput-ceiling.pdf}
+    \caption{Throughput per condition ($\pm$1 sd) against the \code{iperf3} ceiling from kratos.}
+    \label{fig:throughput}
   \end{minipage}\hfill
   \begin{minipage}[t]{0.48\linewidth}\centering
     \fitgraphic[0.25\textheight]{exp-impaired.pdf}
@@ -93,10 +94,14 @@ Security & plain & 102.9 $\pm$ 16.8 & 104\,874\,436 \\
     \label{fig:exp-impaired}
   \end{minipage}
 \end{figure}
+% throughput-ceiling.pdf, ftp-bytes.pdf: report/figures/make_figures.py (analyze.py statistics on
+% data/, data/ftp/, and data/baseline/summary.csv). exp-impaired.pdf: analysis/out/impaired.pdf.
 
 \textbf{Representative operation and throughput.} On the clean link the 100\,MiB sync took
-$116.4 \pm 33.6$\,s, about 8.2\,Mbit/s. That is 50--58\,\% of the \code{iperf3} ceiling from kratos.
-The two receivers share one channel, so the ceilings do not add up.
+$116.4 \pm 33.6$\,s, about 8.2\,Mbit/s: 50--58\,\% of the \code{iperf3} ceiling from kratos
+(Figure~\ref{fig:throughput}). No condition reaches the ceiling: the two receivers share
+one channel, and meshsync adds per-chunk requests and hashing. FTP, a single plain stream, reached
+about 9.8\,Mbit/s.
 
 \textbf{What dominates.} For a full copy, $d_\mathrm{trans}$ dominates: 105\,MB at about 1\,MB/s takes
 about 100\,s, while a round trip takes milliseconds. After a 1\,KiB edit only 66--76\,KB travel, so
@@ -149,7 +154,15 @@ Full file, 5\,\% loss & 248.9 $\pm$ 56.2 & 104\,857\,600 & 346.3 $\pm$ 59.0$^{a}
 % insert 87.83 +- 33.42). Same night: clean 162.8 +- 14.03, loss 346.3 +- 59.04.
 % 104,857,600/75,667 = 1,386; 104,858,624/66,594 = 1,575; 248.9/106.5 = 2.3; 346.3/162.8 = 2.1.
 
-After a 1\,KiB edit FTP sends the whole file again: 1\,386 to 1\,575 times what meshsync sends. For a
+After a 1\,KiB edit FTP sends the whole file again: 1\,386 to 1\,575 times what meshsync sends
+(Figure~\ref{fig:ftp-bytes}).
+
+\begin{figure}[!htbp]\centering
+  \fitgraphic[0.25\textheight]{ftp-bytes.pdf}
+  \caption{Bytes received after a 1\,KiB edit: FTP vs meshsync (log scale, n = 5).}
+  \label{fig:ftp-bytes}
+\end{figure}
+ For a
 fresh full copy, FTP was faster (106.5 vs 162.8\,s): one plain stream, with no chunking, hashing or
 per-chunk requests. Loss slowed both about equally (2.3 and 2.1 times). So meshsync wins after
 edits, not in raw bulk speed.
