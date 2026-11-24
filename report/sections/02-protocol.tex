@@ -7,6 +7,7 @@
 % HANDSHAKE_TIMEOUT 10, PING_INTERVAL 10, MAX_MISSED_PONGS 3, MAX_OUTSTANDING_PER_PEER 8,
 % CDC_MAX 256 KiB. PROTOCOL.md sections: §1 conventions, §3 discovery, §4 framing, §5 messages,
 % §6 setup, §7 states, §8 peers, §10 errors. Decisions: (a), (c), (e), (g), (h), (i), (j), (m).
+\newpage
 \section{Protocol specification (R1)}
 \label{sec:protocol}
 
@@ -44,7 +45,7 @@ Every TCP message is a 12-byte header (Table~\ref{tab:header}) and a body. The r
 exactly 12 bytes, checks the fields in table order, then reads BODY\_LEN bytes. Every failed check
 is fatal. A body must have exactly the keys listed for its type.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.07\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.15\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.12\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.57\linewidth-2\tabcolsep\relax}}
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.10\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.08\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.17\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.12\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.53\linewidth-2\tabcolsep\relax}}
 \caption{TCP message header (12 bytes, \code{struct} format \code{!2sBBII}).}\label{tab:header}\\
 \toprule
 \colhead{Offset} & \colhead{Size} & \colhead{Field} & \colhead{Type} & \colhead{Value; error if invalid} \\
@@ -79,7 +80,7 @@ index entry has exactly \code{path}, \code{size}, \code{file\_hash}, \code{chunk
 each chunk), \code{version} (\code{peer\_id} $\rightarrow$ counter) and \code{deleted}. A peer keeps
 at most 8 CHUNK\_REQs outstanding per peer and sends PING every 10\,s.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.22\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.08\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.085\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.215\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.4\linewidth-2\tabcolsep\relax}}
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.22\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.215\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.385\linewidth-2\tabcolsep\relax}}
 \caption{Protocol message formats and action on receipt.}\label{tab:msg-formats}\\
 \toprule
 \colhead{Code, name} & \colhead{Dir} & \colhead{REQ} & \colhead{Body} & \colhead{Action on receipt} \\
@@ -107,6 +108,7 @@ at most 8 CHUNK\_REQs outstanding per peer and sends PING every 10\,s.
 0x7F BYE & both & 0 & \code{reason} & Close without replying \\
 \end{reptable}
 
+\newpage
 \subsection{Legal message order}
 \label{sec:proto-order}
 

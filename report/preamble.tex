@@ -1,106 +1,79 @@
-% =====================================================================
-%  preamble.tex -- packages, page layout and report macros
-%  Style follows the team's CS-326 SRS (layout, captions, header, tables, links),
-%  adapted to the CS-327 brief: Times New Roman, 12 pt body, 14 pt headings.
-%  Common packages only (TeX Live / Tectonic bundle / Overleaf).
-% =====================================================================
-
-% ---- Fonts: Times New Roman 12 pt body ---------------------------------
+% !TEX root = main.tex
+% Packages, fonts, layout, header/footer, TOC and report macros.
+% Layout follows the latex-report skill (references/style.md); project strings: project.tex.
 \usepackage{iftex}
-\ifPDFTeX
-  % pdfLaTeX (Overleaf): newtx is a Times clone.
-  \usepackage[T1]{fontenc}
-  \usepackage{newtxtext,newtxmath}
-  \usepackage{textcomp}
-  \input{glyphtounicode}\pdfgentounicode=1   % searchable/copyable text
-\else
-  % XeTeX (Tectonic) / LuaTeX. Fonts are loaded by FILE NAME only: a lookup by font name
-  % (e.g. \IfFontExistsTF{Times New Roman}) makes Tectonic scan every system font through
-  % fontconfig, and one malformed system font crashes it (Tectonic panic in fc.rs).
+\ifXeTeX
   \usepackage{fontspec}
-  % Real Times New Roman: install the font files (Arch: ttf-ms-fonts, which puts
-  % times.ttf, timesbd.ttf, timesi.ttf, timesbi.ttf in /usr/share/fonts/TTF/), then set
-  % \realtimestrue below. Default: TeX Gyre Termes, a Times clone in the Tectonic bundle.
-  \newif\ifrealtimes
-  \realtimesfalse
-  \newcommand{\timesfontpath}{/usr/share/fonts/TTF/}
-  \ifrealtimes
-    \setmainfont{times}[
-      Path = \timesfontpath,
-      Extension = .ttf,
-      UprightFont = *,
-      BoldFont = *bd,
-      ItalicFont = *i,
-      BoldItalicFont = *bi]
+  % Times New Roman by FILE NAME (never family name: Tectonic crashes on a system font scan).
+  % Order: project fonts/ -> system /usr/share/fonts/TTF/ -> stop with an error.
+  \def\TNRdir{}%
+  \IfFileExists{fonts/times.ttf}{\def\TNRdir{fonts/}}{%
+    \IfFileExists{/usr/share/fonts/TTF/times.ttf}{\def\TNRdir{/usr/share/fonts/TTF/}}{}}%
+  \ifx\TNRdir\empty
+    \errmessage{Times New Roman not found. Install times.ttf timesbd.ttf timesi.ttf timesbi.ttf (lowercase) in /usr/share/fonts/TTF/ (e.g. AUR ttf-ms-fonts) or in the project's fonts/ folder}%
   \else
-    \setmainfont{texgyretermes}[
-      Extension = .otf,
-      UprightFont = *-regular,
-      BoldFont = *-bold,
-      ItalicFont = *-italic,
-      BoldItalicFont = *-bolditalic]
+    \setmainfont{times.ttf}[Path=\TNRdir,BoldFont=timesbd.ttf,ItalicFont=timesi.ttf,BoldItalicFont=timesbi.ttf]%
   \fi
+  \setmonofont{lmmono10-regular}[Extension=.otf]
+\else
+  \usepackage[T1]{fontenc}\usepackage{newtxtext}
 \fi
-
-% ---- Page layout: A4, 1 inch margins (as the SRS) ------------------------
-% Paper size and margins are not set by the brief text we have: confirm before submission.
-\usepackage[a4paper,margin=1in,headheight=15pt]{geometry}
-\setlength{\parindent}{0pt}
-\setlength{\parskip}{0.35\baselineskip}
-\setlength{\emergencystretch}{2.5em}   % lets TeX loosen a line instead of overrunning the margin
-
-% ---- Tables, figures, colour ------------------------------------------
-\usepackage{array,booktabs,longtable,tabularx}
-\usepackage{graphicx}
-\usepackage{pdfpages}
-\usepackage{xcolor}
-\usepackage{refcount}
-% Diagrams in docs/diagrams/*.tex (network diagram, #74). Only the libraries used there.
+\usepackage[a4paper,margin=2.2cm,top=\dimexpr 2.2cm+12pt\relax,headheight=30pt,headsep=18pt]{geometry}
+\usepackage{amsmath,amssymb,graphicx,pdfpages,booktabs,array,tabularx,longtable,fancyvrb,float,caption,enumitem,xcolor,titlesec,titletoc,lastpage,fancyhdr,refcount}
+% Diagrams in docs/diagrams/*.tex (network diagram). Only the libraries used there.
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning}
-% Captions: bold label as in the SRS, but body size (the brief fixes 12 pt).
-\usepackage[labelfont=bf,skip=6pt]{caption}
-\definecolor{replink}{RGB}{20,55,120}
+\PassOptionsToPackage{hyphens}{url}
+\usepackage{url}
+\Urlmuskip=0mu plus 1mu
+\usepackage[hidelinks,bookmarksnumbered=true,pdfstartview=FitH]{hyperref}
+\urlstyle{same}
+\hypersetup{
+  pdftitle={meshsync: a serverless peer-to-peer file synchroniser},
+  pdfauthor={H. Hanif, M. A. Qazi, M. J. Rao (CS-327 Group G2)},
+  pdfsubject={CS-327 CEP report}}
+\graphicspath{{figures/}{../docs/diagrams/}{../analysis/out/}{../screenshots/}}
+\captionsetup{font=small,labelfont=bf,skip=6pt}
+\setlist{itemsep=1pt,topsep=3pt}
 \definecolor{repgrey}{gray}{0.40}
-\graphicspath{{figures/}{../docs/diagrams/}{../analysis/out/}}
 
 % ---- Float placement: fewer half-empty float pages ---------------------------
 \renewcommand{\topfraction}{0.9}\renewcommand{\bottomfraction}{0.6}
 \renewcommand{\textfraction}{0.08}\renewcommand{\floatpagefraction}{0.8}
 \setcounter{topnumber}{3}\setcounter{totalnumber}{4}
 
-% ---- Headings: 14 pt (brief), compact datasheet style (SRS) ------------------
-\usepackage{titlesec}
+% ---- Headings: section 14 pt, subsection 12 pt (brief), spacing as the skill ----
 \setcounter{secnumdepth}{3}
-\titleformat{\section}{\fontsize{14}{17}\selectfont\bfseries}{\thesection}{0.7em}{}
-% Lower levels stay at body size (12 pt), below the 14 pt heading size.
-\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.7em}{}
-\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection}{0.7em}{}
-\titlespacing*{\section}{0pt}{2.2ex plus 1ex minus .2ex}{0.8ex}
+\titleformat{\section}{\fontsize{14}{17}\selectfont\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\fontsize{12}{14}\selectfont\bfseries}{\thesubsection}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}{\thesubsubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{10pt}{4pt}
 \titlespacing*{\subsection}{0pt}{1.8ex plus 1ex minus .2ex}{0.6ex}
 \titlespacing*{\subsubsection}{0pt}{1.5ex plus .8ex minus .2ex}{0.4ex}
+\linespread{1.05}\setlength{\parindent}{0pt}\setlength{\parskip}{4pt}
+\setlength{\emergencystretch}{2.5em}% as before the restyle: loosen a line instead of overrunning the margin
+\newcommand{\figcenterbegin}{\vspace*{\fill}}
+\newcommand{\figcenterend}{\vspace*{\fill}\clearpage}
 
-% ---- Running header/footer ---------------------------------------------
-\usepackage{fancyhdr}
-\pagestyle{fancy}
-\fancyhf{}
-\fancyhead[L]{\small\color{repgrey}meshsync -- CS-327 CEP report}
-\fancyhead[R]{\small\color{repgrey}Group G2}
-\fancyfoot[C]{\small\thepage}
-\renewcommand{\headrulewidth}{0.4pt}
-\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\thepage}\renewcommand{\headrulewidth}{0pt}}
+% ---- Header (2 lines left, 2 lines right), footer "x of N", no rule ----------
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\footnotesize\begin{tabular}[t]{@{}l@{}}\HeadLeftA\\\HeadLeftB\end{tabular}}
+\fancyhead[R]{\footnotesize\begin{tabular}[t]{@{}r@{}}\HeadRightA\\\HeadRightB\end{tabular}}
+\fancyfoot[C]{\small\makebox[\headwidth][c]{\thepage{} of \pageref{LastPage}}%
+  \hspace{-\headwidth}\makebox[\headwidth][l]{\FootLeft}\hspace{-\headwidth}\makebox[\headwidth][r]{\FootRight}}
+\renewcommand{\headrulewidth}{0pt}
+\fancypagestyle{plain}{\fancyhf{}%
+  \fancyhead[L]{\footnotesize\begin{tabular}[t]{@{}l@{}}\HeadLeftA\\\HeadLeftB\end{tabular}}%
+  \fancyhead[R]{\footnotesize\begin{tabular}[t]{@{}r@{}}\HeadRightA\\\HeadRightB\end{tabular}}%
+  \fancyfoot[C]{\small\makebox[\headwidth][c]{\thepage{} of \pageref{LastPage}}%
+  \hspace{-\headwidth}\makebox[\headwidth][l]{\FootLeft}\hspace{-\headwidth}\makebox[\headwidth][r]{\FootRight}}%
+  \renewcommand{\headrulewidth}{0pt}}
 
-% ---- Hyperlinks (load late) --------------------------------------------
-\PassOptionsToPackage{hyphens}{url}
-\usepackage{url}
-\Urlmuskip=0mu plus 1mu
-\usepackage[colorlinks=true,linkcolor=replink,urlcolor=replink,citecolor=replink,
-            bookmarksnumbered=true,pdfstartview=FitH]{hyperref}
-\urlstyle{same}
-\hypersetup{
-  pdftitle={meshsync: a serverless peer-to-peer file synchroniser},
-  pdfauthor={M. A. Qazi, M. J. Rao, H. Hanif (CS-327 Group G2)},
-  pdfsubject={CS-327 CEP report}}
+% ---- Table of contents: bold main entries with solid leader, dotted sub-entries ----
+\titlecontents{section}[1.6em]{\addvspace{4pt}\bfseries}{\contentslabel{1.6em}}{\hspace*{-1.6em}}%
+  {\hspace{4pt}\leaders\hrule height 0.4pt\hfill\hspace{4pt}\contentspage}
+\titlecontents{subsection}[3.8em]{\addvspace{1pt}}{\contentslabel{2.2em}}{\hspace*{-2.2em}}%
+  {\hspace{4pt}\titlerule*[0.5em]{.}\hspace{4pt}\contentspage}
 
 % =====================================================================
 %  Report macros
@@ -142,7 +115,7 @@
   \end{figure}}
 % \placeholderfigure{todo text}{caption}{label}: boxed slot until the real figure exists.
 \newcommand{\placeholderfigure}[3]{%
-  \begin{figure}[!htbp]\centering
+  \begin{figure}[H]\centering
     \fbox{\parbox[c][4cm][c]{0.9\linewidth}{\centering\TODO{#1}}}
     \caption{#2}\label{#3}
   \end{figure}}
