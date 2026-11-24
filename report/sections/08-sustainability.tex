@@ -1,46 +1,19 @@
 % !TEX root = ../main.tex
-% Section 8. Page budget: part of the 4.25 pages for §5-§10 (report/README.md).
-% Filled by #75 stage 2 (brief §7). Sources: analysis/out/savings.md (analysis/analyze.py on
-% data/full_delta, data/fixed_cdc); PROJECT_CONTEXT.md §13 (projection, counter-weight);
-% energy intensity: Aslan et al. 2018, reference [1] in sections/11-references.tex.
+% Section 8. Page budget: about 0.5 page (trimming pass, 2026-11-24).
+% Sources: analysis/out/savings.md (analyze.py on data/full_delta, data/fixed_cdc); PROJECT_CONTEXT.md
+% §13 (10,000 users x 20 edits/day, counter-weight); energy: Aslan et al. 2018, reference [1].
+% Arithmetic: 200,000 x 105,183,306 B = 21,036.7 GB/day; 200,000 x 171,836 B = 34.4 GB/day;
+% saved 21,002.3 GB/day x 365 = 7,665,837 GB/year; x 0.06 kWh/GB = 1,260 kWh/day, 459,950 kWh/year.
+% CDC vs fixed after insert: 99.94 % chunk data, 99.85 % all bytes (162,562 vs 105,122,508).
 \section{Sustainability and efficiency analysis}
 \label{sec:sustainability}
 
-\textbf{Measured savings.} After a 1\,KiB overwrite of the 100\,MiB file, delta sync sent 75\,667
-chunk bytes instead of 104\,874\,436 for a full copy, saving 99.93\,\% of chunk data and 99.84\,\% of all
-bytes received (171\,836 vs 105\,183\,306, metadata included). After a 1\,KiB insert at offset 0,
-content-defined chunking sent 66\,594 chunk bytes where fixed-size chunking re-sent 104\,877\,836, because
-the insert shifts every fixed chunk boundary: 99.94\,\% saved, 99.85\,\% of all bytes (162\,562 vs
-105\,122\,508). Each value is the mean of n = 5 runs; byte counts did not vary between runs.
-% analysis/out/savings.md; analysis/out/full_delta.md, fixed_cdc.md.
-
-\textbf{Projection.} \emph{Assumption} (PROJECT\_CONTEXT.md §13): 10\,000 users, each making 20 edits
-a day, each edit like ours (a small change to a 100\,MiB file) and synced to one other peer. That is
-200\,000 edits a day. Using all bytes received per edit:
-\begin{itemize}\itemsep0pt
-  \item full copy: $200\,000 \times 105\,183\,306$\,B = 21\,036.7\,GB/day, 7\,678\,381\,GB/year;
-  \item delta sync: $200\,000 \times 171\,836$\,B = 34.4\,GB/day, 12\,544\,GB/year;
-  \item saved: 21\,002.3\,GB/day, about 7\,665\,837\,GB (7.67\,PB) a year.
-\end{itemize}
-(1\,GB = $10^9$ bytes, 365 days.) The CDC-vs-fixed comparison after an insert gives almost the same
-saving (20\,992.0\,GB/day).
-% 10,000 x 20 = 200,000; 105,183,306 x 200,000 = 2.1037e13 B; 171,836 x 200,000 = 3.4367e10 B;
-% (105,183,306 - 171,836) x 200,000 x 365 = 7.6658e15 B; CDC: (105,122,508 - 162,562) x 200,000.
-
-\textbf{Energy.} We convert the saving with the electricity intensity of internet data transmission
-estimated by Aslan et al.\ \refcite{1}: 0.06\,kWh/GB, for 2015. The saving is then $21\,002.3 \times 0.06 \approx 1\,260$\,kWh a day and
-$7\,665\,837 \times 0.06 \approx 459\,950$\,kWh, about 460\,MWh, a year. The figure is for 2015, so applying
-it to traffic today is an assumption; the result shows the order of magnitude, not a precise value.
-% 0.06 kWh/GB for 2015: Aslan et al. 2018 (abstract, confirmed by Ahmed on 2026-11-20).
-% 21,002.294 GB/day x 0.06 = 1,260.1 kWh/day; 7,665,837.31 GB/year x 0.06 = 459,950.2 kWh/year.
-
-\textbf{Assumptions, uncertainty and the counter-weight.} The projection is only as good as its
-inputs: real edits are rarely to 100\,MiB files, many edits touch small files where delta and full
-copy are close, and a 3-peer group would send each edit to two peers, not one. The figures are
-therefore an upper-bound illustration of scale, not a forecast. Their direction is robust: for
-small edits to large files, sending changed chunks instead of whole files removes almost all of the
-traffic. The counter-weight is CPU: every peer hashes each file it scans, and CDC additionally runs a
-rolling hash over every byte to find chunk boundaries, which costs energy on every edit even when no
-bytes are saved. We did not measure CPU time or energy, so we cannot net this off against the
-network saving; that is a limitation of this analysis.
-% PROJECT_CONTEXT.md §13 (hashing CPU cost as counter-weight), D10 (Gear rolling hash).
+After a 1\,KiB edit to the 100\,MiB file, meshsync received 171\,836 bytes where a full copy took
+105\,183\,306, counting all traffic. That is a 99.84\,\% saving; content-defined chunking gives the same
+after an insert (99.85\,\%). We assume, as an illustration, 10\,000 users each making 20 such edits a
+day, each sent to one peer: 200\,000 edits a day. Full copies would move 21\,037\,GB a day; delta sync
+moves 34\,GB. The saving is about 21\,000\,GB a day, or 7.67\,PB a year. At 0.06\,kWh per GB, the 2015
+estimate of Aslan et al.\ \refcite{1}, that is about 1\,260\,kWh a day, or 460\,MWh a year. These are
+order-of-magnitude figures. Few real edits touch 100\,MiB files, a three-peer group sends each edit
+twice, and the energy figure is from 2015. Against the saving stands CPU work: every peer hashes the
+files it scans, and chunking runs a rolling hash over every byte. We did not measure that cost.

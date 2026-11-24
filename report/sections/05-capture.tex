@@ -1,5 +1,5 @@
 % !TEX root = ../main.tex
-% Section 5. Page budget: part of the 4.25 pages for §5-§10 (report/README.md).
+% Section 5. Page budget: about 1 page (trimming pass, 2026-11-24).
 % Filled by #75 stage 1 (R5). Sources: data/captures/README.md (#68) and data/captures/cap1.pcapng.gz,
 % decoded with tshark 4.2.2 and tools/wireshark/meshsync.lua (#87). Every value below was
 % read from the capture with tshark (cap1 frame 317 unless stated). MACs in the capture are
@@ -7,15 +7,13 @@
 \section{Packet capture and encapsulation analysis (R5)}
 \label{sec:capture}
 
-\textbf{Method.} We captured a plain-mode sync of a 100\,MiB file from kratos (192.168.100.92) to
-defalt (192.168.100.80) on kratos's Wi-Fi interface with \code{tshark -s 256 -f "udp port 47000 or
-tcp port 47001"}. Plain mode is our approved R5 deviation: in TLS mode the meshsync messages are
-encrypted. With a snaplen of 256 bytes every header is kept but file contents are not, while the
-real length of each frame is still recorded. MAC addresses were replaced with
-\code{02:00:00:00:00:01}/\code{:02} before commit. Our Lua dissector (D5) decodes the meshsync
-header and body as their own protocol layer. Figure~\ref{fig:capture} shows one CHUNK\_REQ sent
-by defalt, and Table~\ref{tab:layers} relates each header to the layered model.
-% data/captures/README.md ("How they were taken", "Privacy"); tools/wireshark/README.md.
+\textbf{Method.} We captured a plain-mode sync of a 100\,MiB file from kratos to defalt with
+\code{tshark} on kratos, keeping the first 256 bytes of each frame. Plain mode is our approved R5
+deviation, since TLS would hide our messages. MAC addresses were anonymised before commit. Our
+Wireshark dissector decodes the meshsync header as its own layer. Figure~\ref{fig:capture} and
+Table~\ref{tab:layers} show one CHUNK\_REQ from defalt.
+% tshark -s 256 -f "udp port 47000 or tcp port 47001" on wlp2s0; data/captures/README.md ("How
+% they were taken", "Privacy"); tools/wireshark/README.md (D5).
 
 \IfFileExists{figures/capture-chunkreq.png}{%
   \repfigure{capture-chunkreq.png}{One CHUNK\_REQ in Wireshark with the meshsync dissector
@@ -39,44 +37,37 @@ by defalt, and Table~\ref{tab:layers} relates each header to the layered model.
 \endhead
 \bottomrule
 \endlastfoot
-Link (Ethernet~II, as Linux presents the Wi-Fi frame) & 14
+Link (Ethernet~II) & 14
   & dst \code{02:00:00:00:00:02} (kratos), src \code{02:00:00:00:00:01} (defalt), type 0x0800 (IPv4)
-  & Delivery over the local Wi-Fi link via the access point; the type field names the payload (IPv4). \\
+  & Delivers the frame to the next hop on the Wi-Fi LAN. \\
 Network (IPv4) & 20
   & 192.168.100.80 $\rightarrow$ 192.168.100.92, total length 140, TTL 64, protocol 6 (TCP), DF set
-  & Host-to-host addressing across machines; the protocol field hands the payload to TCP. \\
+  & Addresses one host from another. \\
 Transport (TCP) & 32
   & port 48224 $\rightarrow$ 47001, seq 1554, ack 165946 (relative), flags PSH+ACK, window 1044
     ($\times$128 = 133\,632), options NOP, NOP, timestamps
-  & Ports select the meshsync process; sequence and acknowledgement numbers give a reliable,
-    ordered byte stream; the window gives flow control. \\
+  & Ports reach the meshsync process; sequence numbers give a reliable, ordered stream. \\
 meshsync header & 12
   & \code{4d 53} MAGIC, \code{01} VER, \code{20} TYPE CHUNK\_REQ, REQ\_ID 35, BODY\_LEN 76
-  & Message boundaries inside the byte stream, the message type, and REQ\_ID to match the
-    CHUNK\_DATA reply to this request. \\
+  & Marks where each message starts and ends, its type, and how to match the reply. \\
 meshsync body (JSON) & 76
   & \code{\{"hash": "b31631fd\ldots 6b0b"\}}
-  & The request itself: the SHA-256 of the wanted chunk. \\
+  & The request: which chunk we want. \\
 \end{reptable}
 % cap1 frame 317: eth.dst/src/type, ip.src/dst/len/ttl/proto/flags.df, tcp.srcport/dstport/seq/
 % ack/flags/window_size_value (scale 128)/options, meshsync.* (tshark -V with meshsync.lua).
 
-\textbf{Encapsulation.} Each layer treats everything above it as payload and adds its own
-header in front: the 76-byte JSON body gets the 12-byte meshsync header, that 88-byte message is
-the TCP payload, the TCP segment (120 bytes) is the IPv4 payload, and the 140-byte IP packet is
-the payload of the 154-byte frame. Each header is read by its peer layer on the other host and
-removed on the way up: the frame by kratos's network interface, IP and TCP by its kernel, and
-the meshsync header by our reader thread, which uses BODY\_LEN to cut the stream into messages
-and REQ\_ID to route the reply. Only the link header changes between hops; IP and above are
-end-to-end.
+\textbf{Encapsulation.} Each layer wraps the one above in its own header. The 76-byte JSON body
+gets our 12-byte header; that 88-byte message is the TCP payload; the 120-byte segment is the IP
+payload; and the 140-byte packet fills the 154-byte frame. On kratos each header is read by the
+matching layer and removed: the frame by the network card, IP and TCP by the kernel, and our header
+by meshsync. Only the link header changes from hop to hop.
 % Sizes: frame.len 154, ip.len 140, tcp.hdr_len 32, tcp.len 88, meshsync.body_len 76.
 
-\textbf{Overhead.} In this frame, 78 of 154 bytes (51\,\%) are headers, and only 12 of them
-(7.8\,\%) are ours. For bulk data the ratio reverses: the first CHUNK\_DATA segment (frame 225) is
-a 1\,514-byte frame carrying 1\,448 bytes of TCP payload, so the link, IP and TCP headers cost
-66 bytes (4.4\,\%) on every full segment, while our 12-byte header appears once per chunk message
-(BODY\_LEN 65\,558). Over the whole transfer, the meshsync messages added 0.21\,\% to the
-104\,857\,600-byte file, and all frames in both directions added 5.98\,\%. 802.11 MAC and PHY
-overhead is not visible in a managed-mode capture, so the true air-time overhead is higher.
-% cap1 frame 225: frame.len 1514, ip.len 1500, tcp.len 1448, meshsync.type 0x21, req_id 19,
-% body_len 65558. Whole transfer: data/captures/README.md ("Header and body overhead").
+\textbf{Overhead.} In this small frame, 78 of 154 bytes are headers, and only 12 are ours. For bulk
+data it reverses: a full 1\,514-byte data frame carries 66 bytes of link, IP and TCP headers
+(4.4\,\%), while our 12-byte header appears once per 64\,KiB chunk. Over the whole transfer our
+messages added 0.21\,\% to the file, and all headers in both directions 5.98\,\%. Wi-Fi's own
+headers are not visible in this capture, so the true overhead is higher.
+% cap1 frame 225: frame.len 1514, tcp.len 1448, CHUNK_DATA body_len 65558. Whole transfer:
+% data/captures/README.md ("Header and body overhead").

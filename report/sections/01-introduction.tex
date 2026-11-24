@@ -1,33 +1,33 @@
 % !TEX root = ../main.tex
-% Section 1. Suggested page budget: 1 page (suggestion only; README.md has the full table).
-% Filled by: #75 PR (Ahmed's decision, 2026-11-20).
-% Sources: PROJECT_CONTEXT.md §1 (summary), §2 (requirements, deviations), §5 (improvements).
+% Section 1. Page budget: about 0.5 page (trimming pass, 2026-11-24).
+% Sources: PROJECT_CONTEXT.md §1 (summary), §2 (deviations), §5 (improvements); course brief §5
+% (Option E wording). D-numbers: D6 (pure P2P), D10 (CDC), D11 (tagged discovery).
 \section{Introduction and the option selected}
 \label{sec:intro}
 
-meshsync keeps one shared folder identical on three Linux hosts without a central server. A
-file created, edited or deleted on one host reaches the others within seconds; every host runs the
-same program as an equal peer (D6). We built it as a custom option that extends Option~E, using
-our own application-layer protocol directly on sockets: UDP broadcast to discover peers and TCP for
-everything else (Sections~\ref{sec:protocol} and~\ref{sec:implementation}).
-% PROJECT_CONTEXT.md §1 (summary), §2 (option), §4 D6.
+meshsync keeps one shared folder identical on three Linux hosts, with no central server. When a
+file is created, edited or deleted on one host, the others have the change within seconds. Every
+host runs the same program as an equal peer.
 
-The main features are: chunk-level delta sync, where only missing chunks travel and each is
-verified by SHA-256; download of chunks from several peers in parallel; version vectors that detect
-concurrent edits and keep both copies; and an HMAC challenge-response with an optional TLS~1.3
-mode. Each addresses a gap in an existing protocol: FTP sends credentials in plain text, while our
-secret never crosses the wire; HTTP/1.1 answers pipelined requests in order, while our REQ\_ID lets
-replies arrive in any order on one connection; rsync connects two hosts once, while we keep a
-multi-peer mesh in continuous sync; fixed-size blocks re-send everything after an insert near the
-start, while content-defined chunking (D10) does not; and mDNS-style discovery can be spoofed, while
-our ANNOUNCEs carry an HMAC tag (D11). Sections~\ref{sec:capture}--\ref{sec:failure} give the
-evidence: the capture, the measurements, the design tensions, the sustainability estimate and the
-behaviour under failure.
-% PROJECT_CONTEXT.md §1 (core features), §5 (improvements table: FTP, HTTP/1.1, rsync,
-% fixed-block sync, mDNS/SSDP rows).
+Option~E of the brief asks for file distribution, client-server against peer-to-peer. We chose a
+custom option that extends it: a peer-to-peer synchroniser with our own application-layer protocol,
+written directly on sockets. Peers find each other by UDP broadcast and use TCP for everything else.
+We did not measure how distribution time grows with the number of receivers. Instead,
+Section~\ref{sec:ftp} compares meshsync with FTP, a client-server protocol, on the same hosts.
 
-\paragraph{Approved deviations.} The following deviations were stated in our proposal and
-approved (PROJECT\_CONTEXT.md §2, quoted verbatim):
+Each main feature fixes a gap in an existing protocol:
+\begin{itemize}\itemsep0pt
+  \item \textbf{Delta sync.} Only changed chunks travel, each checked by SHA-256. FTP resends the
+        whole file. Content-defined chunking keeps this true after an insert, where fixed-size
+        blocks would all shift.
+  \item \textbf{One connection, any order.} A request ID lets replies arrive out of order on one
+        TCP connection. HTTP/1.1 must answer in order.
+  \item \textbf{Many peers, always in sync.} rsync links two hosts, once.
+  \item \textbf{Authentication.} An HMAC handshake proves the shared secret without sending it, and
+        discovery messages are tagged. FTP sends the password in clear, and mDNS can be spoofed.
+\end{itemize}
+
+\paragraph{Approved deviations.} From our approved proposal, quoted verbatim:
 
 \begin{quote}
 Approved deviations (stated in proposal): custom option (extends Option E); R5 capture in plain

@@ -1,121 +1,85 @@
 % !TEX root = ../main.tex
-% Section 2. Page budget: 2.5 pages (report/README.md, set by #74).
-% Filled by #74 (R1). Condensed from docs/PROTOCOL.md (the full wire spec, frozen interface);
-% every value is copied from it or from src/meshsync/protocol/constants.py, cited per block.
-% If space runs out, cut the PING hex example (2.3) first, never a field, code or rule.
+% Section 2. Page budget: about 2.25 pages (trimming pass, 2026-11-24).
+% Condensed from docs/PROTOCOL.md (the full wire spec, frozen interface). Values from it or from
+% src/meshsync/protocol/constants.py: UDP_PORT 47000, TCP_PORT 47001, MAX_DATAGRAM 512,
+% ANNOUNCE_INTERVAL 5, PEER_EXPIRY 15, ANNOUNCE_MAX_SKEW 30, HEADER_SIZE 12, HEADER_FMT "!2sBBII",
+% MAGIC b"MS", VERSION 1, MAX_REQ_ID 0xFFFFFFFF, MAX_BODY 1 MiB, NONCE_BYTES 16,
+% HANDSHAKE_TIMEOUT 10, PING_INTERVAL 10, MAX_MISSED_PONGS 3, MAX_OUTSTANDING_PER_PEER 8,
+% CDC_MAX 256 KiB. PROTOCOL.md sections: §1 conventions, §3 discovery, §4 framing, §5 messages,
+% §6 setup, §7 states, §8 peers, §10 errors. Decisions: (a), (c), (e), (g), (h), (i), (j), (m).
 \section{Protocol specification (R1)}
 \label{sec:protocol}
 
-This section is the complete wire protocol in condensed form; \code{docs/PROTOCOL.md} in the
-repository (Appendix~\ref{app:code}) adds worked examples and rationale. All multi-byte integers are
-unsigned big-endian; all JSON is UTF-8. \code{peer\_id} is exactly 8 \emph{uppercase} hex
-characters; every other hex value (hashes, nonces, MACs, tags) is lowercase, and the other case
-is invalid. \code{K} is the group's 32-byte shared secret and never crosses the wire.
-% PROTOCOL.md §1 (byte order, hex case, K); constants.py PEER_ID_HEX_LEN = 8.
+This is our complete wire protocol in short form; \code{docs/PROTOCOL.md} in the repository adds
+worked examples. Integers are unsigned and big-endian. JSON is UTF-8. A \code{peer\_id} is 8
+uppercase hex characters; all other hex values are lowercase. \code{K} is the group's 32-byte
+shared secret. It never crosses the wire.
 
 \subsection{Overview}
 \label{sec:proto-overview}
 
-All peers run the same program; there is no server (D6). On each TCP connection the side that
-dialled is the \emph{initiator} (I) and the side that accepted is the \emph{responder} (R); roles
-matter only for the handshake and REQ\_ID numbering. When peer A learns of peer B and has no
-connection to it, A dials B only if \code{A.peer\_id < B.peer\_id} (string comparison), so each pair
-has one dialer. Discovery (ANNOUNCE, LEAVE) uses UDP broadcast to 255.255.255.255, port 47000;
-everything else uses TCP port 47001, optionally inside TLS~1.3. Both ports are configurable, and
-the TCP port in use is announced. After a connection closes, the dialer retries every 5\,s
-while the peer is still in its peer table.
-% PROTOCOL.md §1 (roles), §2 (transport, ports), §8.1 (dial rule), §8.4 (reconnect every
-% ANNOUNCE_INTERVAL); constants.py UDP_PORT = 47000, TCP_PORT = 47001, ANNOUNCE_INTERVAL = 5.
+All peers are equal; there is no server. On each TCP connection, the side that dials is the
+\emph{initiator} (I) and the other is the \emph{responder} (R). Only the peer with the lower
+\code{peer\_id} dials, so each pair has one connection. Discovery uses UDP broadcast on port 47000;
+everything else uses TCP port 47001, optionally inside TLS~1.3. A closed connection is redialled
+every 5\,s while the peer is still known.
 
 \subsection{Discovery datagram (UDP)}
 \label{sec:proto-discovery}
 
-One datagram is one JSON object of at most 512 bytes with exactly nine fields (any other key
-makes it invalid; JSON booleans are not integers): \code{magic} = \code{"MS"}; \code{ver} = 1;
-\code{type} = \code{"ANNOUNCE"} or \code{"LEAVE"}; \code{peer\_id}; \code{name} (non-empty string);
-\code{tcp\_port} (1--65535); \code{index\_rev} (integer $\ge 0$); \code{ts} (sender's Unix time,
-seconds); \code{tag} (64 lowercase hex). The tag is
-\[
-  \mathit{tag} = \mathrm{hex}\bigl(\mathrm{HMAC}\mbox{-}\mathrm{SHA256}(K,\ \mathrm{canonical\_json}(\mbox{all fields except \textit{tag}}))\bigr),
-\]
-where canonical JSON has keys sorted by code point, separators exactly \code{,} and \code{:} with no
-whitespace, and non-ASCII written as raw UTF-8. The receiver recomputes it over the fields it
-parsed, not over the received bytes. \textbf{Receive rules}, applied in order; the datagram is
-silently dropped at the first that fails: (1)~length $\le$ 512 bytes, valid UTF-8 JSON, exactly
-the nine fields with valid types; (2)~\code{peer\_id} differs from the receiver's own (its own
-broadcast echoed back); (3)~\code{tag} equals the recomputed tag (constant-time comparison);
-(4)~$|\mathit{now} - \mathit{ts}| \le 30$\,s; (5)~\code{ts} is greater than the last accepted
-\code{ts} from this \code{peer\_id} (replay); (6)~if \code{type} = LEAVE, remove the peer from the
-peer table; (7)~if \code{type} = ANNOUNCE, add or update the peer (name, address, port,
-\code{index\_rev}, last-seen time).
-The peer's address is the datagram's source IP, never a body value; the last accepted \code{ts} is
-kept after LEAVE or expiry. Each peer sends ANNOUNCE every 5\,s and one LEAVE at shutdown, with
-$\mathit{ts} = \max(\lfloor\mathit{now}\rfloor, \mathit{last\_sent\_ts}+1)$; a peer not heard for more
-than 15\,s is removed. Leaving the peer table never closes a TCP connection.
-% PROTOCOL.md §3.1 (fields), §3.2 (tag, D11), §3.4 (receive rules), §3.5 (timers);
-% constants.py MAX_DATAGRAM = 512, ANNOUNCE_MAX_SKEW = 30, ANNOUNCE_INTERVAL = 5, PEER_EXPIRY = 15.
+Each datagram is one JSON object of at most 512 bytes with exactly nine fields: \code{magic}
+(\code{"MS"}), \code{ver} (1), \code{type} (\code{"ANNOUNCE"} or \code{"LEAVE"}), \code{peer\_id},
+\code{name}, \code{tcp\_port}, \code{index\_rev}, \code{ts} (Unix seconds) and \code{tag}. The tag is
+the HMAC-SHA256 under \code{K} of the other eight fields, written as canonical JSON (keys sorted,
+no spaces). A receiver drops the datagram silently at the first failed check: (1)~size, JSON and
+fields valid; (2)~not its own \code{peer\_id}; (3)~tag correct; (4)~\code{ts} within 30\,s of its
+clock; (5)~\code{ts} newer than the last one from that peer. It then removes the peer (LEAVE) or
+adds or updates it (ANNOUNCE). The peer's address is the datagram's source IP. Peers announce every
+5\,s and send LEAVE at shutdown; a peer silent for 15\,s is dropped.
 
 \subsection{TCP framing}
 \label{sec:proto-framing}
 
-Every TCP message is a 12-byte header (\code{struct} format \code{!2sBBII}) followed by a body
-(Table~\ref{tab:header}). The reader reads exactly 12 bytes, validates the header, then reads
-exactly \code{BODY\_LEN} bytes, looping because TCP is a byte stream.
-% PROTOCOL.md §4.1; constants.py HEADER_SIZE = 12, HEADER_FMT = "!2sBBII", MAGIC = b"MS",
-% VERSION = 1, MAX_REQ_ID = 0xFFFFFFFF, MAX_BODY = 1024 * 1024.
+Every TCP message is a 12-byte header (Table~\ref{tab:header}) and a body. The reader takes
+exactly 12 bytes, checks the fields in table order, then reads BODY\_LEN bytes. Every failed check
+is fatal. A body must have exactly the keys listed for its type.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.10\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.08\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.17\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.15\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.50\linewidth-2\tabcolsep\relax}}
-\caption{TCP message header.}\label{tab:header}\\
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.07\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.15\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.12\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.57\linewidth-2\tabcolsep\relax}}
+\caption{TCP message header (12 bytes, \code{struct} format \code{!2sBBII}).}\label{tab:header}\\
 \toprule
-\colhead{Offset} & \colhead{Size} & \colhead{Field} & \colhead{Type} & \colhead{Value} \\
+\colhead{Offset} & \colhead{Size} & \colhead{Field} & \colhead{Type} & \colhead{Value; error if invalid} \\
 \midrule
 \endfirsthead
 \multicolumn{5}{@{}l}{\tablecontinued}\\
 \toprule
-\colhead{Offset} & \colhead{Size} & \colhead{Field} & \colhead{Type} & \colhead{Value} \\
+\colhead{Offset} & \colhead{Size} & \colhead{Field} & \colhead{Type} & \colhead{Value; error if invalid} \\
 \midrule
 \endhead
 \bottomrule
 \endlastfoot
-0 & 2 & MAGIC & bytes & \code{4d 53} (ASCII \code{"MS"}) \\
-2 & 1 & VER & uint8 & 1 \\
-3 & 1 & TYPE & uint8 & message code (Table~\ref{tab:msg-formats}) \\
+0 & 2 & MAGIC & bytes & \code{4d 53} (\code{"MS"}); else BAD\_HEADER \\
+2 & 1 & VER & uint8 & 1; else BAD\_VERSION \\
+3 & 1 & TYPE & uint8 & code from Table~\ref{tab:msg-formats}; else BAD\_HEADER \\
 4 & 4 & REQ\_ID & uint32 & 0 to \code{0xFFFFFFFF} \\
-8 & 4 & BODY\_LEN & uint32 & body bytes, $\le$ 1\,048\,576 (1\,MiB) \\
-12 & N & BODY & bytes & UTF-8 JSON object; raw chunk bytes for CHUNK\_DATA \\
+8 & 4 & BODY\_LEN & uint32 & $\le$ 1\,048\,576 (1\,MiB); else TOO\_LARGE \\
+12 & N & BODY & bytes & UTF-8 JSON object (raw bytes for CHUNK\_DATA); else BAD\_HEADER \\
 \end{reptable}
 
-\textbf{Validation order} (every failure is fatal, codes in Table~\ref{tab:errors}): MAGIC
-$\neq$ \code{"MS"} $\rightarrow$ BAD\_HEADER; VER $\neq$ 1 $\rightarrow$ BAD\_VERSION; unknown TYPE
-$\rightarrow$ BAD\_HEADER; BODY\_LEN $>$ 1\,MiB $\rightarrow$ TOO\_LARGE; body not valid JSON or not
-matching its schema $\rightarrow$ BAD\_HEADER. A body must have exactly the listed keys; NaN and
-Infinity are invalid and booleans are not integers. Bodies are not canonicalised.
-% PROTOCOL.md §4.2, decisions (a), (c).
-
-\textbf{REQ\_ID.} A request carries a non-zero REQ\_ID and its reply (or the ERROR answering it)
-the same one, so replies may arrive in any order. The initiator uses odd IDs and the responder even
-IDs; they wrap after \code{0xFFFFFFFF} and skip IDs still awaiting a reply. A received non-zero ID
-with the receiver's own parity is a reply, otherwise a request. REQ\_ID 0 marks handshake
-messages, NOTIFY, BYE and an ERROR not tied to a request.
-% PROTOCOL.md §4.3, decision (h).
-
-\textbf{Example.} PING with REQ\_ID 1 and body \code{\{"t": 1730473200.5\}} (19 bytes) is
-\code{4d53 01 30 00000001 00000013} followed by the 19 body bytes.
-% PROTOCOL.md §4.4 (generated by framing.send_msg). First thing to cut if §2 is over budget.
+\textbf{REQ\_ID.} A request has a non-zero REQ\_ID, and its reply carries the same one, so replies
+may come in any order. The initiator uses odd IDs and the responder even ones, so each side knows
+which messages are replies. REQ\_ID 0 marks messages that are neither: the handshake, NOTIFY, BYE,
+and an ERROR not tied to a request.
 
 \subsection{Messages}
 \label{sec:proto-messages}
 
-Table~\ref{tab:msg-formats} lists every TCP message. HELLO to AUTH\_OK are legal only in state
-HANDSHAKE; ERROR in any state; all others only in AUTHENTICATED or SYNCED. ``Req'' and ``Reply''
-mean a REQ\_ID as in Section~\ref{sec:proto-framing}; ``0'' means REQ\_ID 0. Nonces are 16 random
-bytes sent as 32 lowercase hex characters; MACs and hashes are 64 lowercase hex. An index entry is
-a JSON object with exactly \code{path}, \code{size}, \code{file\_hash}, \code{chunks} (SHA-256 of each
-chunk, in order), \code{version} (\code{peer\_id} $\rightarrow$ counter) and \code{deleted}.
-% PROTOCOL.md §5 (overview, 5.1-5.13), §9.1 (index entry); constants.py NONCE_BYTES = 16,
-% MAX_OUTSTANDING_PER_PEER = 8, CDC_MAX = 256 * 1024; MsgType codes.
+Table~\ref{tab:msg-formats} lists every TCP message. Codes 0x01--0x04 are legal only during the
+handshake, ERROR at any time, and the rest only after it. Nonces are 16 random bytes in hex. An
+index entry has exactly \code{path}, \code{size}, \code{file\_hash}, \code{chunks} (the SHA-256 of
+each chunk), \code{version} (\code{peer\_id} $\rightarrow$ counter) and \code{deleted}. A peer keeps
+at most 8 CHUNK\_REQs outstanding per peer and sends PING every 10\,s.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.225\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.085\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.085\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.195\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.41\linewidth-2\tabcolsep\relax}}
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.22\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.08\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.085\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.215\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.4\linewidth-2\tabcolsep\relax}}
 \caption{Protocol message formats and action on receipt.}\label{tab:msg-formats}\\
 \toprule
 \colhead{Code, name} & \colhead{Dir} & \colhead{REQ} & \colhead{Body} & \colhead{Action on receipt} \\
@@ -128,124 +92,73 @@ chunk, in order), \code{version} (\code{peer\_id} $\rightarrow$ counter) and \co
 \endhead
 \bottomrule
 \endlastfoot
-0x01 HELLO & I$\rightarrow$R & 0 & \code{peer\_id}, \code{name}, \code{proto\_ver} (=1), \code{nonce\_i}
-  & \code{proto\_ver} $\neq$ 1: BAD\_VERSION; own \code{peer\_id}: AUTH\_FAILED; else reply HELLO\_ACK \\
-0x02 HELLO\_ACK & R$\rightarrow$I & 0 & \code{peer\_id}, \code{name}, \code{nonce\_r}, \code{mac\_r}
-  & own \code{peer\_id} or wrong \code{mac\_r}: AUTH\_FAILED; else send AUTH \\
-0x03 AUTH & I$\rightarrow$R & 0 & \code{mac\_i}
-  & wrong \code{mac\_i}: AUTH\_FAILED; else send AUTH\_OK, now AUTHENTICATED \\
-0x04 AUTH\_OK & R$\rightarrow$I & 0 & \{\} & now AUTHENTICATED \\
-0x10 INDEX\_REQ & both & Req & \{\} & reply INDEX; each side sends one on becoming AUTHENTICATED \\
-0x11 INDEX & both & Reply & \code{index\_rev}, \code{files} (entries)
-  & compare each entry with the local one, act on the result; then SYNCED. One invalid entry
-    makes the message invalid \\
-0x12 NOTIFY & both & 0 & \code{entry}
-  & sent to every peer when a local file is created, changed or deleted; compare the entry; no reply \\
-0x20 CHUNK\_REQ & both & Req & \code{hash}
-  & reply CHUNK\_DATA if stored, else ERROR CHUNK\_NOT\_FOUND; sender keeps $\le$ 8 outstanding per peer \\
-0x21 CHUNK\_DATA & both & Reply & raw bytes ($\le$ 256\,KiB)
-  & store if SHA-256 equals the requested hash, else discard and ask another peer \\
-0x30 PING & both & Req & \code{t} (Unix time) & reply PONG with the same REQ\_ID and \code{t}; sent every 10\,s \\
-0x31 PONG & both & Reply & \code{t} & RTT on own monotonic clock; reset missed-PONG count \\
-0x7E ERROR & both & Reply or 0 & \code{code}, \code{msg}
-  & fail the matching request or log; close if the code is fatal; never answer with ERROR \\
-0x7F BYE & both & 0 & \code{reason} & close without replying; outstanding requests fail \\
+0x01 HELLO & I$\rightarrow$R & 0 & \code{peer\_id}, \code{name}, \code{proto\_ver}, \code{nonce\_i} & \code{proto\_ver}~$\neq$~1: BAD\_VERSION. Own \code{peer\_id}: AUTH\_FAILED. Else reply HELLO\_ACK \\
+0x02 HELLO\_ACK & R$\rightarrow$I & 0 & \code{peer\_id}, \code{name}, \code{nonce\_r}, \code{mac\_r} & Own \code{peer\_id} or wrong \code{mac\_r}: AUTH\_FAILED. Else send AUTH \\
+0x03 AUTH & I$\rightarrow$R & 0 & \code{mac\_i} & Wrong \code{mac\_i}: AUTH\_FAILED. Else send AUTH\_OK \\
+0x04 AUTH\_OK & R$\rightarrow$I & 0 & \{\} & Connection is AUTHENTICATED \\
+0x10 INDEX\_REQ & both & Req & \{\} & Reply INDEX \\
+0x11 INDEX & both & Reply & \code{index\_rev}, \code{files} & Compare each entry with the local one; then SYNCED \\
+0x12 NOTIFY & both & 0 & \code{entry} & Compare the entry; no reply \\
+0x20 CHUNK\_REQ & both & Req & \code{hash} & Reply CHUNK\_DATA, or ERROR CHUNK\_NOT\_FOUND \\
+0x21 CHUNK\_DATA & both & Reply & raw bytes, $\le$\,256\,KiB & Store if SHA-256 matches; else ask another peer \\
+0x30 PING & both & Req & \code{t} & Reply PONG with the same REQ\_ID and \code{t} \\
+0x31 PONG & both & Reply & \code{t} & Record RTT; reset missed-PONG count \\
+0x7E ERROR & both & Reply or 0 & \code{code}, \code{msg} & Fail the matching request; close if fatal; never reply \\
+0x7F BYE & both & 0 & \code{reason} & Close without replying \\
 \end{reptable}
 
 \subsection{Legal message order}
 \label{sec:proto-order}
 
-\textbf{Connection setup} (initiator = lower \code{peer\_id}): (1) TCP connect; (2) with
-\code{--tls}, the TLS~1.3 handshake; (3) I$\rightarrow$R HELLO; (4) R$\rightarrow$I HELLO\_ACK;
-(5) I$\rightarrow$R AUTH; (6) R$\rightarrow$I AUTH\_OK, after which both sides are AUTHENTICATED;
-(7) with TLS, each side checks the peer certificate's CN equals the peer's HELLO/HELLO\_ACK
-\code{name}; (8) both sides send INDEX\_REQ and answer the other's with INDEX; on receiving INDEX
-the connection is SYNCED. The whole HELLO to AUTH\_OK exchange must finish within 10\,s.
-Table~\ref{tab:transitions} gives the state changes; the specific failure cases are in
-Tables~\ref{tab:msg-formats} and~\ref{tab:errors}.
-% PROTOCOL.md §6.1 (sequence), §6.6, §7.2 (transition table, condensed); constants.py
-% HANDSHAKE_TIMEOUT = 10.
+A connection is set up in this order: TCP connect; with \code{--tls}, the TLS handshake; HELLO
+(I$\rightarrow$R), HELLO\_ACK (R$\rightarrow$I), AUTH (I$\rightarrow$R), AUTH\_OK (R$\rightarrow$I);
+then both sides send INDEX\_REQ and answer with INDEX.
+If both peers dial each other, both keep the link whose initiator has the lower \code{peer\_id}.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.19\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.31\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.33\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.17\linewidth-2\tabcolsep\relax}}
-\caption{Connection state transitions (A/S = AUTHENTICATED or SYNCED).}\label{tab:transitions}\\
-\toprule
-\colhead{State} & \colhead{Event} & \colhead{Action} & \colhead{Next} \\
-\midrule
-\endfirsthead
-\multicolumn{4}{@{}l}{\tablecontinued}\\
-\toprule
-\colhead{State} & \colhead{Event} & \colhead{Action} & \colhead{Next} \\
-\midrule
-\endhead
-\bottomrule
-\endlastfoot
-HANDSHAKE & AUTH\_OK sent (R) / received (I); with TLS, CN check passed & send INDEX\_REQ & AUTHENTI\-CATED \\
-HANDSHAKE & any message other than the next handshake message & ERROR ILLEGAL\_STATE, close & CLOSED \\
-HANDSHAKE & ERROR received, or 10\,s elapsed & close, no reply & CLOSED \\
-AUTHENTI\-CATED & INDEX for our INDEX\_REQ (or it failed or took $>$ 10\,s) & compare entries & SYNCED \\
-any open & fatal error detected (validation order; Tables~\ref{tab:msg-formats}, \ref{tab:errors}) & send ERROR (REQ\_ID 0 unless answering a request), close & CLOSED \\
-A/S & valid type without a handler, or handler raised & ERROR INTERNAL; a stray PONG is ignored & same \\
-A/S & reply with no outstanding request & ignore (logged) & same \\
-A/S & fatal ERROR or BYE received & close, no reply & CLOSED \\
-A/S & local shutdown; duplicate link; 3rd PING in a row without PONG & BYE \code{"shutdown"} / \code{"duplicate"} / \code{"liveness"}, close & CLOSED \\
-A/S & no bytes for 40\,s; EOF or socket error & close & CLOSED \\
-\end{reptable}
-
-Each side sends PING every 10\,s; three consecutive PINGs without a PONG close the link, so a
-silently dead peer is noticed after about 30\,s. If two authenticated links to the same peer
-exist, both ends keep the one whose initiator has the lower \code{peer\_id}. CLOSED is final; a new
-connection starts at HANDSHAKE.
-% PROTOCOL.md §7.2, §8.2 (decision (j)), §8.3 (liveness; 40 s = PING_INTERVAL x
-% (MAX_MISSED_PONGS + 1), decision (m)); constants.py PING_INTERVAL = 10, MAX_MISSED_PONGS = 3.
+A connection becomes AUTHENTICATED when AUTH\_OK is sent or received (and, with TLS, the
+certificate check passes), and SYNCED when the first INDEX arrives (or after 10\,s). It closes on a
+fatal ERROR sent or received, a BYE, a handshake not finished in 10\,s, three PINGs in a row without
+a PONG, 40\,s without any bytes, or a socket error. A valid message with no handler gets ERROR
+INTERNAL and the link stays open; a reply that matches no request is ignored.
 
 \subsection{Error codes}
 \label{sec:proto-errors}
 
-An ERROR body is \code{\{"code": int, "msg": string\}}. For a fatal code the sender sends ERROR and
-closes; the receiver closes without replying. An unknown code is itself an invalid body
-(BAD\_HEADER).
-% PROTOCOL.md §5.12, §10; constants.py ErrorCode, FATAL_ERRORS.
+An ERROR body is \code{\{"code": int, "msg": string\}}. After a fatal error the sender closes the
+connection, and the receiver closes without replying (Table~\ref{tab:errors}). An unknown code is
+itself BAD\_HEADER.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.29\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.53\linewidth-2\tabcolsep\relax}}
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.3\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.52\linewidth-2\tabcolsep\relax}}
 \caption{Error codes.}\label{tab:errors}\\
 \toprule
-\colhead{Code} & \colhead{Name} & \colhead{Fatal} & \colhead{Sent when / receiver action} \\
+\colhead{Code} & \colhead{Name} & \colhead{Fatal} & \colhead{Sent when} \\
 \midrule
 \endfirsthead
 \multicolumn{4}{@{}l}{\tablecontinued}\\
 \toprule
-\colhead{Code} & \colhead{Name} & \colhead{Fatal} & \colhead{Sent when / receiver action} \\
+\colhead{Code} & \colhead{Name} & \colhead{Fatal} & \colhead{Sent when} \\
 \midrule
 \endhead
 \bottomrule
 \endlastfoot
-0x01 & BAD\_HEADER & yes & wrong MAGIC; unknown TYPE; invalid body, entry or path / close \\
-0x02 & BAD\_VERSION & yes & header VER or HELLO \code{proto\_ver} $\neq$ 1 / close \\
-0x03 & ILLEGAL\_STATE & yes & wrong message in the handshake, or a handshake message after it / close \\
-0x04 & AUTH\_FAILED & yes & wrong MAC; self-connection; TLS CN $\neq$ HELLO name / close \\
-0x05 & TOO\_LARGE & yes & BODY\_LEN $>$ 1\,MiB / close \\
-0x10 & CHUNK\_NOT\_FOUND & no & CHUNK\_REQ for a chunk not stored / ask another peer \\
-0x11 & CHUNK\_CORRUPT & no & defined for a chunk failing SHA-256, not sent by the current code / ask another peer \\
-0x20 & BUSY & no & defined for refusing more requests, not sent by the current code / retry later or elsewhere \\
-0x7F & INTERNAL & no & no handler for a valid type, or the handler failed / fail the request, keep the link \\
+0x01 & BAD\_HEADER & yes & Bad MAGIC, TYPE, body or path \\
+0x02 & BAD\_VERSION & yes & VER or \code{proto\_ver} not 1 \\
+0x03 & ILLEGAL\_STATE & yes & Message out of order \\
+0x04 & AUTH\_FAILED & yes & Bad MAC, self, or CN mismatch \\
+0x05 & TOO\_LARGE & yes & Body over 1\,MiB \\
+0x10 & CHUNK\_NOT\_FOUND & no & Chunk not stored; ask another peer \\
+0x11 & CHUNK\_CORRUPT & no & Reserved; not sent yet \\
+0x20 & BUSY & no & Reserved; not sent yet \\
+0x7F & INTERNAL & no & Handler missing or failed \\
 \end{reptable}
 
 \subsection{Security}
 \label{sec:proto-security}
 
-\textbf{HMAC challenge-response} (D4). Each side proves it knows \code{K} by MACing the
-\emph{other} side's fresh nonce:
-$\mathit{mac\_r} = \mathrm{HMAC}\mbox{-}\mathrm{SHA256}(K, \mathtt{0x52} \,\|\, \mathit{nonce\_i} \,\|\, \mathit{nonce\_r})$ and
-$\mathit{mac\_i} = \mathrm{HMAC}\mbox{-}\mathrm{SHA256}(K, \mathtt{0x49} \,\|\, \mathit{nonce\_r} \,\|\, \mathit{nonce\_i})$.
-The 33-byte input is the ASCII role byte (\code{"R"} or \code{"I"}) then the two nonces as raw
-(hex-decoded) bytes; the role byte stops a MAC being reflected back. Nonces come from a
-cryptographic RNG, MACs are compared in constant time, and a recorded handshake cannot be replayed.
-% PROTOCOL.md §6.3, §6.4 (decision (g)).
-
-\textbf{TLS mode} (D9, \code{--tls}; \code{--plain} is the default). Right after connect/accept and
-before HELLO, both sides run TLS~1.3 (minimum version) with mutual certificates
-(\code{CERT\_REQUIRED}) trusting only the group CA; hostname checking is off because peers dial
-discovered IPs. The HMAC handshake then runs inside TLS, followed by the CN check above. Both
-peers must use the same mode. Plain mode exists for the packet capture (R5) and as a measurement
-baseline; in it, traffic after the handshake is neither encrypted nor integrity-protected.
-% PROTOCOL.md §6.2 (decision (e)), §11.2 (plain mode limits); PROJECT_CONTEXT.md D9.
+\textbf{HMAC handshake.} Each side proves it knows \code{K} by signing the other side's fresh nonce:
+$\mathit{mac\_r} = \mathrm{HMAC}(K, \mbox{\code{R}} \,\|\, \mathit{nonce\_i} \,\|\, \mathit{nonce\_r})$ and
+$\mathit{mac\_i} = \mathrm{HMAC}(K, \mbox{\code{I}} \,\|\, \mathit{nonce\_r} \,\|\, \mathit{nonce\_i})$,
+over the raw nonce bytes. The role letter stops a MAC being sent back as the other side's proof,
+and fresh nonces stop replay. \textbf{TLS mode} (\code{--tls}) runs TLS~1.3 with certificates from a
+group CA on both sides, before HELLO. After the handshake each side checks that the certificate's
+name matches the peer's HELLO name. Plain mode exists only for the capture and as a baseline.

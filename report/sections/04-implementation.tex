@@ -1,82 +1,42 @@
 % !TEX root = ../main.tex
-% Section 4. Page budget: 1 page (report/README.md, set by #74).
-% Filled by #74 (R2, R4). Sources: PROJECT_CONTEXT.md §2 (R2, R4), §4 (D1-D15), §6.1, §8.2;
-% docs/PROTOCOL.md §2 (transport rationale), §3, §8.3; src/meshsync/protocol/constants.py.
+% Section 4. Page budget: about 1 page (trimming pass, 2026-11-24).
+% Sources: PROJECT_CONTEXT.md §2 (R2 row), §4 (D1, D3, D15), §6.1, §8.2 (connection.py);
+% docs/PROTOCOL.md §2; constants.py ANNOUNCE_INTERVAL 5, MAX_DATAGRAM 512, CDC_MAX 256 KiB,
+% MAX_OUTSTANDING_PER_PEER 8.
 \section{Implementation notes (R2, R4)}
 \label{sec:implementation}
 
-\textbf{Socket API only (R2).} meshsync is Python 3.11+ on the standard library only (D1, D15).
-Both transports are written directly on the \code{socket} module: a UDP datagram socket for
-discovery and blocking TCP stream sockets with timeouts for data, using \code{threading} rather
-than asyncio or any networking framework (D1). No application-protocol library is used: the
-message format, framing, handshake and state machine are ours. The other modules are helpers for
-data formats and cryptography, not protocols: \code{struct} packs and unpacks the 12-byte header,
-\code{json} encodes datagrams and message bodies, \code{hashlib} computes SHA-256 of chunks and
-files, \code{hmac} computes discovery tags and handshake MACs and compares them in constant time,
-and \code{ssl} wraps our own TCP sockets in TLS~1.3 without changing the meshsync messages inside.
-% PROJECT_CONTEXT.md §2 (R2 row: hashlib/hmac/ssl/json/struct are helpers), §4 D1, D15.
+\textbf{Sockets only (R2).} meshsync is written in Python 3.11+ with the standard library only.
+Both transports use the \code{socket} module directly, with threads rather than any networking
+framework. The message format, framing, handshake and state machine are all ours. The other modules
+are helpers, not protocols: \code{struct} packs the header, \code{json} encodes bodies,
+\code{hashlib} computes SHA-256, \code{hmac} signs tags and handshakes, and \code{ssl} wraps our own
+TCP sockets in TLS.
 
-\textbf{Threads.} Each connection object owns its socket, its state, one reader thread that
-receives and dispatches messages, a send lock that serialises all writes, and the table of
-outstanding REQ\_IDs. Replies are matched to requests by REQ\_ID, so several requests (up to 8
-CHUNK\_REQs per peer) are in flight at once on one connection.
-% PROJECT_CONTEXT.md §8.2 (connection.py: socket, state, reader thread, send lock, REQ_ID map),
-% §8.3 (Connection.request -> Future); constants.py MAX_OUTSTANDING_PER_PEER = 8.
-
-\textbf{Key decisions.} Fixed binary header with JSON control bodies and raw chunk bytes (D3);
-HMAC-SHA256 challenge-response on a shared secret (D4); pure peer-to-peer full mesh, no server
-(D6); TLS~1.3 with mutual certificates as a core mode, plain mode kept for capture and baseline
-(D9); HMAC-tagged, timestamped discovery (D11); version vectors so that no decision compares clocks
-across hosts (D2).
-% PROJECT_CONTEXT.md §4.
+\textbf{Threads.} Each connection has one reader thread and a send lock. Replies are matched to
+requests by REQ\_ID, so up to 8 chunk requests per peer are in flight on one connection.
 
 \subsection{Transport layer justification (R4)}
 \label{sec:transport}
 
-Table~\ref{tab:transport} justifies each choice against the four transport requirements, and
-states what the opposite choice would cost.
-% docs/PROTOCOL.md §2 and PROJECT_CONTEXT.md §6.1; values: ANNOUNCE_INTERVAL = 5,
-% PEER_EXPIRY = 15, MAX_DATAGRAM = 512, CDC_MAX = 256 KiB, ANNOUNCE_MAX_SKEW = 30.
+ANNOUNCE and LEAVE travel over UDP; every other message in Table~\ref{tab:msg-formats} travels
+over TCP. Table~\ref{tab:transport} justifies both choices.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.175\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.4125\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.4125\linewidth-2\tabcolsep\relax}}
-\caption{Transport choice per message group, and what the opposite choice would lose.}\label{tab:transport}\\
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.16\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.42\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.42\linewidth-2\tabcolsep\relax}}
+\caption{Transport choice per message, and what the opposite choice would lose.}\label{tab:transport}\\
 \toprule
-\colhead{Requirement} & \colhead{ANNOUNCE, LEAVE: UDP broadcast, port 47000} & \colhead{All other messages: TCP, port 47001} \\
+\colhead{Need} & \colhead{ANNOUNCE, LEAVE: UDP 47000} & \colhead{All other messages: TCP 47001} \\
 \midrule
 \endfirsthead
 \multicolumn{3}{@{}l}{\tablecontinued}\\
 \toprule
-\colhead{Requirement} & \colhead{ANNOUNCE, LEAVE: UDP broadcast, port 47000} & \colhead{All other messages: TCP, port 47001} \\
+\colhead{Need} & \colhead{ANNOUNCE, LEAVE: UDP 47000} & \colhead{All other messages: TCP 47001} \\
 \midrule
 \endhead
 \bottomrule
 \endlastfoot
-Reliable data transfer
-  & Not needed: discovery is soft state. A lost ANNOUNCE is replaced 5\,s later, and expiry
-    after 15\,s tolerates lost datagrams. \emph{With TCP:} a connection needs the peer's address
-    first, which is exactly what discovery has to find; TCP cannot broadcast.
-  & Required: index entries and chunks must arrive complete and in order. TCP retransmits and
-    orders; SHA-256 per chunk adds an end-to-end check. \emph{With UDP:} we would have to build
-    sequence numbers, acknowledgements, retransmission and reordering, and split each chunk of up
-    to 256\,KiB across many datagrams. \\
-Throughput
-  & Tiny datagrams ($\le$ 512 bytes) every 5\,s. \emph{With TCP:} one connection per pair just to
-    say ``I am here'', with its handshake and kept state, for no data.
-  & Bulk chunk transfer needs congestion and flow control; one persistent connection per pair
-    avoids repeated handshakes. \emph{With UDP:} we would need our own congestion control or
-    flood the shared Wi-Fi, and our own flow control. \\
-Timing
-  & One broadcast reaches every peer at once, with no setup, so a new peer appears within
-    seconds. \emph{With TCP:} a separate connection setup to every peer, each one only possible
-    after its address is known.
-  & Sync is seconds-level, so TCP's retransmission delay is acceptable; REQ\_ID multiplexing
-    removes head-of-line blocking between requests on one connection. \emph{With UDP:} lower
-    per-message latency that seconds-level sync does not need. \\
-Security
-  & Broadcast is visible to all, and TLS needs a connection, so each datagram carries an HMAC tag
-    and timestamp (30\,s window, replay check). \emph{With TCP:} TLS would be possible, but only
-    after the address problem above.
-  & HMAC challenge-response proves knowledge of the secret, and TLS~1.3 runs over the TCP
-    stream, adding encryption and certificate checks. \emph{With UDP:} TLS, which needs a reliable
-    byte stream, could not be used as is. \\
+Reliable transfer & Not needed: a lost ANNOUNCE is replaced 5\,s later. \emph{With TCP:} we would need the peer's address before we could connect, and finding it is discovery's job. & Needed: chunks must arrive whole and in order. \emph{With UDP:} we would rebuild sequence numbers, ACKs and retransmission, and split each 256\,KiB chunk over many datagrams. \\
+Throughput & Tiny: one datagram of at most 512 bytes every 5\,s. \emph{With TCP:} a connection per pair just to say ``I am here''. & Bulk data needs congestion and flow control. \emph{With UDP:} we would write our own, or flood the shared Wi-Fi. \\
+Timing & One broadcast reaches all peers at once. \emph{With TCP:} a separate setup to every peer, and no broadcast. & Sync works in seconds, so retransmission delay is fine. \emph{With UDP:} lower latency we do not need. \\
+Security & TLS needs a connection, so each datagram carries an HMAC tag and timestamp. & The HMAC handshake and TLS~1.3 both run over the TCP stream. \emph{With UDP:} TLS could not be used as is. \\
 \end{reptable}
