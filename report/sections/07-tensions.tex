@@ -11,7 +11,9 @@ lost. \emph{Position:} TCP for all data; UDP only for soft-state discovery. \emp
 as on a clean link, but took $474.2 \pm 143.7$\,s instead of $116.4 \pm 33.6$\,s
 (Table~\ref{tab:experiments}). In \code{cap5}, 402 of 7\,935 data segments (5.1\,\%) were
 retransmitted (Section~\ref{sec:failure}). For a file synchroniser a corrupt or missing file is a
-failure while a slower one is not, so we accept the 4.1 times slowdown. The same capture shows the
+failure while a slower one is not, so we accept the slowdown. It is the same for FTP: rerun on one
+night, loss made meshsync 2.1 times slower and FTP 2.3 times (Section~\ref{sec:ftp}), so the cost
+comes from TCP under loss, which any reliable protocol pays. The same capture shows the
 other side: discovery over UDP lost kratos twice under loss, which is harmless because it is
 refreshed every 5\,s and never closes a working TCP connection.
 

@@ -2,7 +2,7 @@
 % AI-use declaration: not counted in the page limit (PROJECT_CONTEXT.md §16).
 % Summary of docs/AI_USE_LOG.md by area of work (Ahmed's choice on #75, 2026-11-20); the complete,
 % dated log stays in the repository. Hand-written from the log: update it when the log changes.
-% Counts and models as logged on 2026-11-20 (46 entries, including the one for this appendix).
+% Counts and models as logged on 2026-11-24 (48 entries).
 \section{AI-use declaration}
 \label{app:ai-use}
 
@@ -18,7 +18,7 @@ and a review by another member.
 % #28, #29, #31, #6, #1, #4 entries); AGENTS.md §7 (R-7.3, R-7.4), §10.
 
 \begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.19\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.18\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.13\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.50\linewidth-2\tabcolsep\relax}}
-\caption{AI use by area of work (46 log entries).}\label{tab:ai-use}\\
+\caption{AI use by area of work (48 log entries).}\label{tab:ai-use}\\
 \toprule
 \colhead{Area} & \colhead{Issues} & \colhead{Member} & \colhead{What the AI was used for} \\
 \midrule
@@ -41,16 +41,16 @@ Sync & \#9--\#14, \#51 & Mujtaba
     engine, with unit tests. \\
 Transfer and metrics & \#15--\#17, \#60 & Huzaifa, Mujtaba
   & Chunk scheduler and its duplicate-fetch fix, file assembler, per-message metrics logger. \\
-Testing and measurement tools & \#18--\#20, \#62, \#63, \#69--\#71, \#77 & Mujtaba, Huzaifa
+Testing and measurement tools & \#18--\#20, \#62, \#63, \#69--\#71, \#77, \#95 & Mujtaba, Huzaifa
   & Localhost integration and failure-scenario tests, netem profiles, test-data generator,
-    single- and multi-host experiment runners, baseline scripts, the analysis script. \\
+    single- and multi-host experiment runners, the FTP baseline runner, baseline scripts, the analysis script. \\
 Measurement sessions & \#67, \#68, \#70, \#77 & Mujtaba
   & Step-by-step commands for the 3-host deployment, captures, baseline and §11 batch, and the
     data READMEs written from the recorded results (MACs and user names redacted). \\
 Wireshark dissector & \#82 & Mujtaba
   & The Lua dissector and its decode script for the captures. \\
 Report & \#73--\#75 & Ahmed
-  & LaTeX skeleton and style; drafting §1--§9 and this appendix from the repository's specification, data and
+  & LaTeX skeleton and style; drafting §1--§9 (including the FTP comparison) and this appendix from the repository's specification, data and
     captures. Format, structure, page budget and the cited energy figure were decided or
     checked by Ahmed. \\
 \end{reptable}

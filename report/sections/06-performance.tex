@@ -158,7 +158,7 @@ of milliseconds. The Wi-Fi channel is the bottleneck, and queueing behind it ($d
 explains the large run-to-run spread. For delta sync and CDC after an insert, only 75\,667 and 66\,594
 chunk bytes cross the network, so $d_\mathrm{trans}$ almost disappears (every run but one under 1.4\,s) and the
 remaining time is a few request/reply round trips plus our own $d_\mathrm{proc}$ (hashing, index
-compare). 5\,\% loss makes the transfer 4.1 times slower: lost segments must be retransmitted and TCP
+compare). 5\,\% loss makes the transfer 4.1 times slower in this batch (2.1 times in a later batch on a better night, Section~\ref{sec:ftp}): lost segments must be retransmitted and TCP
 shrinks its congestion window, which shows up as extra waiting, not as distance; the same loss is
 behind the 402 retransmissions in Section~\ref{sec:failure}. Adding 50\,ms of delay, a
 $d_\mathrm{prop}$-like term, has no clear effect ($118.8 \pm 27.1$ vs $116.4 \pm 33.6$\,s): at
@@ -182,7 +182,7 @@ receivers while every other run took under 1\,s; the CSVs do not show the cause.
 setup time ($0.65 \pm 1.08$\,s) comes from one 5.075\,s value (run 5, minipc); the other nine are
 0.045--0.364\,s. (4) TLS received more chunk bytes than the file size: besides the excluded run 4,
 defalt in run 5 received 107\,665\,543 bytes, a duplicate fetch (\#60) that \code{analyze.py} does not
-flag. (5) TLS was not slower than plain; on this network the difference is inside the spread.
+flag. (5) TLS was not slower than plain; on this network the difference is inside the spread. (6) The 4.1 times loss slowdown of this batch fell to 2.1 times when rerun on the FTP night (Section~\ref{sec:ftp}): the Wi-Fi, not the protocol.
 % data/README.md (lossy defalt, power saving); data/full_delta/run4.csv (delta 21.706522,
 % 27.767192 s); data/tls/run5.csv (plain minipc setup_s 5.075; tls defalt chunk_bytes 107665543).
 
@@ -195,3 +195,58 @@ compare times across hosts. The captures in Section~\ref{sec:capture} keep only 
 frame, so they give counts and headers, not payload timings.
 % data/README.md; data/<experiment>/run*.csv (e2e_from first_notify, poll_s 0.5);
 % data/captures/README.md (snaplen 256, kratos clock).
+
+\subsection{Comparison with FTP}
+\label{sec:ftp}
+
+To test our claims against an existing protocol (PROJECT\_CONTEXT.md §5) we measured plain FTP on
+the same three hosts, file and edits (21 November 2026): kratos ran vsftpd, and minipc and defalt
+downloaded at the same time with Python's \code{ftplib}, checking each file's SHA-256 afterwards.
+Each run has four variants: the full 100\,MiB file, the file after the 1\,KiB overwrite, after the
+1\,KiB insert at offset 0, and the full file under 5\,\% netem loss on kratos. To compare times
+fairly, meshsync's link condition (clean, 5\,\% loss, +50\,ms) was rerun right after the FTP batch
+on the same night. Table~\ref{tab:ftp} gives mean $\pm$ sd over n = 5 runs, the two receivers
+averaged per run, as computed by \code{analyze.py}.
+% data/ftp/README.md (setup, variants, same-night batch, times 22:16-23:32 and 23:59-01:23);
+% analysis/analyze.py on data/ftp/run*.csv and data/ftp/meshsync_same_night/run*.csv.
+
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.20\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.20\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.16\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.20\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}}
+\caption{FTP vs meshsync on the same hosts (mean $\pm$ sd, n = 5).}\label{tab:ftp}\\
+\toprule
+\colhead{Case} & \colhead{FTP time (s)} & \colhead{FTP bytes} & \colhead{meshsync time (s)} & \colhead{meshsync chunk bytes} \\
+\midrule
+\endfirsthead
+\multicolumn{5}{@{}l}{\tablecontinued}\\
+\toprule
+\colhead{Case} & \colhead{FTP time (s)} & \colhead{FTP bytes} & \colhead{meshsync time (s)} & \colhead{meshsync chunk bytes} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+Full file, clean & 106.5 $\pm$ 32.5 & 104\,857\,600 & 162.8 $\pm$ 14.0$^{a}$ & 104\,874\,436 \\
+Full file, 5\,\% loss & 248.9 $\pm$ 56.2 & 104\,857\,600 & 346.3 $\pm$ 59.0$^{a}$ & 104\,881\,052 \\
+Loss $\div$ clean & 2.3$\times$ & & 2.1$\times$$^{a}$ & \\
+1\,KiB overwrite & 88.5 $\pm$ 17.3 & 104\,857\,600 & 5.2 $\pm$ 10.9$^{b}$ & 75\,667 \\
+1\,KiB insert at 0 & 87.8 $\pm$ 33.4 & 104\,858\,624 & 0.30 $\pm$ 0.41$^{b}$ & 66\,594 \\
+\end{reptable}
+{\footnotesize $^{a}$\,Same night as FTP. $^{b}$\,Main batch (Table~\ref{tab:experiments}): delta sync and CDC; not rerun on the FTP night, so compare bytes, not times.\par}
+% FTP: analysis of data/ftp/run*.csv (full 106.5 +- 32.53, loss 248.9 +- 56.16, overwrite
+% 88.5 +- 17.28, insert 87.83 +- 33.42; bytes sd 0). meshsync same night:
+% data/ftp/meshsync_same_night (clean 162.8 +- 14.03, loss 346.3 +- 59.04, loss chunk bytes
+% 104,881,052 +- 14,794). 248.9/106.5 = 2.34; 346.3/162.8 = 2.13.
+
+\textbf{What the comparison shows.} After a small edit FTP downloads the whole file again: 1\,386
+times the bytes meshsync sent after the overwrite, and 1\,575 times after the insert, because FTP has
+no delta transfer. For a fresh full copy FTP was faster on the same night (106.5 vs 162.8\,s): one
+plain TCP stream with no chunking, hashing or per-chunk requests, so less $d_\mathrm{proc}$ and fewer
+round trips. meshsync's advantage is after edits, in authentication and in integrity, not in raw bulk
+speed. Loss hurt both about equally on the same night (2.1 vs 2.3 times the clean time), so the 4.1
+times of the main batch (Table~\ref{tab:experiments}) came from that night's worse Wi-Fi, not from
+the protocol. A capture of one FTP download (not committed, because it holds the test password)
+shows the weaknesses §5 lists: \code{USER} and \code{PASS} in plain text (frames 6 and 9), and two TCP
+connections per transfer, the control connection on port 21 (28 frames) and a separate passive data
+connection on port 40029 (77\,918 frames). meshsync sends only nonces and MACs in its handshake
+(Section~\ref{sec:failure}), uses one connection per peer pair, and checks SHA-256 per chunk, while
+the FTP clients had to compare SHA-256 themselves.
+% 104,857,600 / 75,667 = 1,385.8; 104,858,624 / 66,594 = 1,574.6. Capture: data/ftp/README.md
+% ("What the capture shows").
