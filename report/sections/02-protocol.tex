@@ -32,11 +32,14 @@ Each datagram is one JSON object of at most 512 bytes with exactly nine fields: 
 (\code{"MS"}), \code{ver} (1), \code{type} (\code{"ANNOUNCE"} or \code{"LEAVE"}), \code{peer\_id},
 \code{name}, \code{tcp\_port}, \code{index\_rev}, \code{ts} (Unix seconds) and \code{tag}. The tag is
 the HMAC-SHA256 under \code{K} of the other eight fields, written as canonical JSON (keys sorted,
-no spaces). A receiver drops the datagram silently at the first failed check: (1)~size, JSON and
-fields valid; (2)~not its own \code{peer\_id}; (3)~tag correct; (4)~\code{ts} within 30\,s of its
-clock; (5)~\code{ts} newer than the last one from that peer. It then removes the peer (LEAVE) or
-adds or updates it (ANNOUNCE). The peer's address is the datagram's source IP. Peers announce every
-5\,s and send LEAVE at shutdown; a peer silent for 15\,s is dropped.
+no spaces). Figure~\ref{fig:discovery} shows how a datagram is sent and checked. A receiver applies
+the five checks in order and silently drops the datagram at the first that fails.
+
+\begin{figure}[!htbp]\centering
+  \input{../docs/diagrams/discovery-g2.tex}
+  \caption{UDP discovery: the receiver's checks in order, the peer table and the dial rule.}
+  \label{fig:discovery}
+\end{figure}
 
 \subsection{TCP framing}
 \label{sec:proto-framing}
