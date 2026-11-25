@@ -27,7 +27,7 @@ no spaces). Figure~\ref{fig:discovery} shows how a datagram is sent and checked.
 the five checks in order and silently drops the datagram at the first that fails.
 
 \begin{figure}[H]\centering
-  \input{../docs/diagrams/discovery-g2.tex}
+  \scalebox{0.85}{\input{../docs/diagrams/discovery-g2.tex}}
   \caption{UDP discovery: the receiver's checks in order, the peer table and the dial rule.}
   \label{fig:discovery}
 \end{figure}
@@ -60,16 +60,14 @@ is fatal. A body must have exactly the keys listed for its type.
 12 & N & BODY & bytes & UTF-8 JSON object (raw bytes for CHUNK\_DATA); else BAD\_HEADER \\
 \end{reptable}
 
-\textbf{REQ\_ID.} A request has a non-zero REQ\_ID, and its reply carries the same one, so replies
-may come in any order. The initiator uses odd IDs and the responder even ones, so each side knows
-which messages are replies. REQ\_ID 0 marks messages that are neither: the handshake, NOTIFY, BYE,
-and an ERROR not tied to a request.
+\textbf{REQ\_ID.} A reply carries its request's non-zero REQ\_ID, so replies may come in any order.
+The initiator uses odd IDs, the responder even ones. REQ\_ID 0 marks messages that are neither.
 
 \subsection{Messages}
 \label{sec:proto-messages}
 
-Table~\ref{tab:msg-formats} lists every TCP message. Codes 0x01--0x04 are legal only during the
-handshake, ERROR at any time, and the rest only after it. Nonces are 16 random bytes in hex. An
+Table~\ref{tab:msg-formats} lists every TCP message. Codes 0x01--0x04 are legal only in the
+handshake, ERROR at any time, the rest after it. Nonces are 16 random bytes in hex. An
 index entry has exactly \code{path}, \code{size}, \code{file\_hash}, \code{chunks} (the SHA-256 of
 each chunk), \code{version} (\code{peer\_id} $\rightarrow$ counter) and \code{deleted}. A peer keeps
 at most 8 CHUNK\_REQs outstanding per peer and sends PING every 10\,s.
@@ -111,7 +109,7 @@ INTERNAL and the link stays open; a reply that matches no request is ignored. If
 each other, both keep the link whose initiator has the lower \code{peer\_id}.
 
 \begin{figure}[H]\centering
-  \input{../docs/diagrams/protocol-g2.tex}
+  \scalebox{0.85}{\input{../docs/diagrams/protocol-g2.tex}}
   \caption{Connection setup (left) and connection states (right). Dashed: TLS mode only.}
   \label{fig:protocol}
 \end{figure}

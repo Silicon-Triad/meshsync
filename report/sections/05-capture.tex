@@ -16,15 +16,14 @@ Wireshark dissector decodes the meshsync header as its own layer. Figure~\ref{fi
 % Figure: Wireshark screenshots by Ahmed (2026-11-25), selected detail lines stacked and
 % annotated per layer (layout only; no values changed).
 
-\IfFileExists{figures/capture-chunkreq.png}{%
-  \repfigure{capture-chunkreq.png}{One CHUNK\_REQ in Wireshark with our dissector (capture
-  \code{cap1}, frame 317), annotated by layer. Selected lines of each header are shown; the red box
-  marks our 12-byte header in the packet bytes.}{fig:capture}{0.42\textheight}%
-}{%
-  \placeholderfigure{Wireshark screenshot of cap1 frame 317, saved as
-  report/figures/capture-chunkreq.png}{One CHUNK\_REQ in Wireshark with the meshsync dissector
-  (capture \code{cap1}, frame 317), every layer expanded.}{fig:capture}%
-}
+\begin{figure}[H]\centering
+  \IfFileExists{figures/capture-chunkreq.png}{\fitgraphic[0.36\textheight]{capture-chunkreq.png}}%
+    {\fbox{\parbox[c][4cm][c]{0.9\linewidth}{\centering\TODO{Wireshark screenshot of cap1 frame 317}}}}
+  \caption{One CHUNK\_REQ in Wireshark with our dissector (capture \code{cap1}, frame 317), annotated by
+  layer. Selected lines of each header are shown; the red box marks our 12-byte header in the packet
+  bytes.}
+  \label{fig:capture}
+\end{figure}
 
 Each layer adds what the one above lacks: the link header delivers the frame across the Wi-Fi
 LAN, IP addresses the other host, TCP reaches our process by port with a reliable, ordered stream,

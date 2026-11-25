@@ -9,15 +9,15 @@
 We ran meshsync on three separate Linux machines on one Wi-Fi LAN, 192.168.100.0/24, with the
 router at 192.168.100.1 (Figure~\ref{fig:network}, Table~\ref{tab:ip-plan}), the network we will demonstrate on.
 
-\begin{figure}[H]\centering
-  \input{../docs/diagrams/network-g2.tex}
+\begin{figure}[tp]\centering
+  \scalebox{0.85}{\input{../docs/diagrams/network-g2.tex}}
   \caption{Network diagram. Dashed: Wi-Fi links; arrows: the three TCP connections, from the side
   that dialled.}
   \label{fig:network}
 \end{figure}
 
 \begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.15\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.17\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.2\linewidth-2\tabcolsep\relax}}
-\caption{IP addressing plan and host configuration. Every host listened on UDP 47000 and TCP 47001.}\label{tab:ip-plan}\\
+\caption{IP plan and host configuration (all hosts listen on UDP 47000, TCP 47001).}\label{tab:ip-plan}\\
 \toprule
 \colhead{Host} & \colhead{TCP role} & \colhead{Address (iface)} & \colhead{OS, Python} & \colhead{Firewall} \\
 \midrule
@@ -29,8 +29,8 @@ router at 192.168.100.1 (Figure~\ref{fig:network}, Table~\ref{tab:ip-plan}), the
 \endhead
 \bottomrule
 \endlastfoot
-kratos (laptop) & dials minipc, defalt & 192.168.100.92/24, DHCP (\code{wlp2s0}) & Omarchy 4.0.6, Linux 7.2.8; Python 3.14.8 & ufw on; 47000/udp and 47001/tcp allowed \\
-minipc (mini PC) & accepts kratos, dials defalt & 192.168.100.190/24, static (\code{wlp2s0}) & Debian 13, Linux 6.12.113; Python 3.13.5 & nftables, accept all \\
+kratos (laptop) & dials minipc, defalt & 192.168.100.92/24, DHCP (\code{wlp2s0}) & Omarchy 4.0.6, Linux 7.2.8; Python 3.14.8 & ufw: 47000, 47001 open \\
+minipc (mini PC) & accepts kratos, dials defalt & 192.168.100.190/24, static (\code{wlp2s0}) & Debian 13, Linux 6.12.113; Python 3.13.5 & accepts all \\
 defalt (laptop) & accepts both & 192.168.100.80/24, DHCP (\code{wlp4s0}) & Ubuntu 20.04.6, Linux 5.15.0; Python 3.11.18 & none \\
 \end{reptable}
 

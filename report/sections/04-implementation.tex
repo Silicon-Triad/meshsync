@@ -6,16 +6,6 @@
 \section{Implementation notes (R2, R4)}
 \label{sec:implementation}
 
-\textbf{Sockets only (R2).} meshsync is written in Python 3.11+ with the standard library only.
-Both transports use the \code{socket} module directly, with threads rather than any networking
-framework. The message format, framing, handshake and state machine are all ours. The other modules
-are helpers, not protocols: \code{struct} packs the header, \code{json} encodes bodies,
-\code{hashlib} computes SHA-256, \code{hmac} signs tags and handshakes, and \code{ssl} wraps our own
-TCP sockets in TLS.
-
-\textbf{Threads.} Each connection has one reader thread and a send lock. Replies are matched to
-requests by REQ\_ID, so up to 8 chunk requests per peer are in flight on one connection.
-
 \subsection{Transport layer justification (R4)}
 \label{sec:transport}
 
@@ -40,3 +30,16 @@ Throughput & Tiny: $\le$\,512 bytes every 5\,s. \emph{With TCP:} a connection pe
 Timing & One broadcast reaches all peers at once. \emph{With TCP:} a separate setup to every peer, and no broadcast. & Sync works in seconds, so retransmission delay is fine. \emph{With UDP:} lower latency we do not need. \\
 Security & TLS needs a connection, so each datagram carries an HMAC tag and timestamp. & The HMAC handshake and TLS~1.3 both run over the TCP stream. \emph{With UDP:} TLS could not be used as is. \\
 \end{reptable}
+
+\subsection{Sockets and threads (R2)}
+\label{sec:r2}
+
+\textbf{Sockets only (R2).} meshsync is written in Python 3.11+ with the standard library only.
+Both transports use the \code{socket} module directly, with threads rather than any networking
+framework. The message format, framing, handshake and state machine are all ours. The other modules
+are helpers, not protocols: \code{struct} packs the header, \code{json} encodes bodies,
+\code{hashlib} computes SHA-256, \code{hmac} signs tags and handshakes, and \code{ssl} wraps our own
+TCP sockets in TLS.
+
+\textbf{Threads.} Each connection has one reader thread and a send lock. Replies are matched to
+requests by REQ\_ID, so up to 8 chunk requests per peer are in flight on one connection.
