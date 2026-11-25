@@ -1,58 +1,53 @@
 % !TEX root = ../main.tex
 % AI-use declaration: not counted in the page limit (PROJECT_CONTEXT.md §16).
-% Summary of docs/AI_USE_LOG.md by area of work (Ahmed's choice on #75, 2026-11-20); the complete,
-% dated log stays in the repository. Hand-written from the log: update it when the log changes.
-% Counts and models as logged on 2026-11-24 (55 entries).
-\section{AI-use declaration}
+% Layout follows the declaration Ahmed supplied as a model (2026-11-25): tools, purposes split
+% into manual and AI-generated work, responsibility. Content from docs/AI_USE_LOG.md (56
+% entries on 2026-11-25; tool column: Opus 5.5, Sonnet 5.5 for #2, #3, #40) and its "Kept /
+% changed" column; review rules from AGENTS.md §7 and §10. Manual work only where the log or
+% this session records it; the team confirms the TODO items.
+\section{Generative AI use declaration}
 \label{app:ai-use}
 
-We used one AI tool, Claude Code (Anthropic), with the Claude Opus~5.5 model and, for three
-networking entries, Claude Sonnet~5.5; seven early entries do not record the model.
-Table~\ref{tab:ai-use} summarises which parts of the work it was used for. The complete, dated
-log, one entry per piece of work with what was kept or changed, is \code{docs/AI\_USE\_LOG.md}
-in the repository (Appendix~\ref{app:code}). Under our rules (\code{AGENTS.md} §10), the AI must
-post a plan for the member's approval before writing, must not invent protocol values or measured
-numbers, and must never approve or merge; changes are merged only through a pull request with CI
-and a review by another member.
-% docs/AI_USE_LOG.md (tool column: Opus 5.5; Sonnet 5.5 for #2, #3, #40; no model for the #27,
-% #28, #29, #31, #6, #1, #4 entries); AGENTS.md §7 (R-7.3, R-7.4), §10.
+Generative AI tools were used in this project. The tool was Claude Code (Anthropic, models
+Claude Opus~5.5 and Claude Sonnet~5.5), used by Muhammad Ahmed Qazi, Mujtaba Jawaid Rao and
+Huzaifa Hanif. Every use was recorded in our AI use log, \code{docs/AI\_USE\_LOG.md} in the
+repository (date, member, tool, purpose, what was kept or changed).
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.19\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.18\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.13\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.50\linewidth-2\tabcolsep\relax}}
-\caption{AI use by area of work (55 log entries).}\label{tab:ai-use}\\
-\toprule
-\colhead{Area} & \colhead{Issues} & \colhead{Member} & \colhead{What the AI was used for} \\
-\midrule
-\endfirsthead
-\multicolumn{4}{@{}l}{\tablecontinued}\\
-\toprule
-\colhead{Area} & \colhead{Issues} & \colhead{Member} & \colhead{What the AI was used for} \\
-\midrule
-\endhead
-\bottomrule
-\endlastfoot
-Repository setup and rules & \#27--\#29 (PRs), \#7, \#8 & Ahmed
-  & Project scaffold, CI, PR template, GitHub setup guide, the \code{AGENTS.md} rulebook, the
-    local-mesh script, and consolidating \code{PROTOCOL.md} into one specification. \\
-Protocol and networking & \#1--\#6, \#31, \#40, \#49, \#64, \#72 & Ahmed
-  & Message validation, discovery, HMAC handshake, TLS contexts, connections, peer manager, node
-    wiring, the CLI and its \code{status}/\code{stats}/metrics options, with unit tests. \\
-Sync & \#9--\#14, \#51 & Mujtaba
-  & Chunker, chunk store, index, polling scanner and its cache, version vectors and the sync
-    engine, with unit tests. \\
-Transfer and metrics & \#15--\#17, \#60 & Huzaifa, Mujtaba
-  & Chunk scheduler and its duplicate-fetch fix, file assembler, per-message metrics logger. \\
-Testing and measurement tools & \#18--\#20, \#62, \#63, \#69--\#71, \#77, \#95 & Mujtaba, Huzaifa
-  & Localhost integration and failure-scenario tests, netem profiles, test-data generator,
-    single- and multi-host experiment runners, the FTP baseline runner, baseline scripts, the analysis script. \\
-Measurement sessions & \#67, \#68, \#70, \#77 & Mujtaba
-  & Step-by-step commands for the 3-host deployment, captures, baseline and §11 batch, and the
-    data READMEs written from the recorded results (MACs and user names redacted). \\
-Wireshark dissector & \#82 & Mujtaba
-  & The Lua dissector and its decode script for the captures. \\
-Report & \#73--\#75 & Ahmed
-  & LaTeX skeleton and style; drafting §1--§9 (including the FTP comparison) and this appendix from the repository's specification, data and
-    captures. Format, structure, page budget and the cited energy figure were decided or
-    checked by Ahmed. \\
-\end{reptable}
-% Area grouping and issue numbers from the log's "Used for" column; members from its "Member"
-% column (Huzaifa: #15, #16, #20, #60; Mujtaba: #17 and the rest).
+\paragraph{Purposes.}
+\begin{itemize}
+  \item \textbf{Project setup and rules:} repository scaffold, continuous integration, PR
+    template, GitHub setup guide, folder READMEs and the \code{AGENTS.md} rulebook. The design
+    decisions D1--D15 and the requirement list in \code{PROJECT\_CONTEXT.md} were made by the team;
+    the AI only works from them and may not edit that file.
+  \item \textbf{Code authoring:}
+    \begin{itemize}
+      \item \emph{Manual authorship:} \TODO{team: name any modules or fixes written by hand.}
+      \item \emph{AI generated:} first drafts of the protocol and networking modules (framing,
+        message validation, discovery, HMAC handshake, TLS, connections, peer manager, node, CLI),
+        the sync modules (chunker, chunk store, index, scanner, version vectors, engine), the
+        transfer and metrics modules, their unit and integration tests, the measurement and
+        analysis scripts, and the Wireshark dissector. Each draft followed a plan the owning member
+        approved first, and was merged only through a pull request with CI and a review by another
+        member, who requested fixes where needed.
+    \end{itemize}
+  \item \textbf{Protocol specification:} consolidating \code{PROTOCOL.md} into one document, with
+    worked examples generated from the code. Protocol values were copied from
+    \code{PROJECT\_CONTEXT.md} and \code{constants.py}, never invented by the AI.
+  \item \textbf{Measurement:} step-by-step commands for the three-host deployment, the captures,
+    the baseline and the experiment batch, and the data READMEs written from the recorded results.
+    The members ran every measurement on their own machines; all numbers in this report come from
+    those runs.
+  \item \textbf{Report writing:}
+    \begin{itemize}
+      \item \emph{Manual editing:} the page style, header and footer, the Wireshark screenshots,
+        the choice of the cited energy figure, and the report's structure and page budget.
+        \TODO{team: add any sections re-written by hand.}
+      \item \emph{AI generated:} the LaTeX skeleton, the first drafts of Sections 1--10 and the
+        appendices from our specification, data and captures, the diagrams and graphs, and the
+        trimming passes that shortened the text and lowered its fog index.
+    \end{itemize}
+\end{itemize}
+
+\paragraph{Responsibility.} The group reviewed and understood the implementation, the results and
+this report, checked them against the course brief, and takes full responsibility for the
+submitted work.
