@@ -15,10 +15,13 @@ Wireshark dissector decodes the meshsync header as its own layer. Figure~\ref{fi
 Table~\ref{tab:layers} show one CHUNK\_REQ from defalt.
 % tshark -s 256 -f "udp port 47000 or tcp port 47001" on wlp2s0; data/captures/README.md ("How
 % they were taken", "Privacy"); tools/wireshark/README.md (D5).
+% Figure: Wireshark screenshots by Ahmed (2026-11-25), selected detail lines stacked and
+% annotated per layer (layout only; no values changed).
 
 \IfFileExists{figures/capture-chunkreq.png}{%
-  \repfigure{capture-chunkreq.png}{One CHUNK\_REQ in Wireshark with the meshsync dissector
-  (capture \code{cap1}, frame 317), every layer expanded.}{fig:capture}{0.5\textheight}%
+  \repfigure{capture-chunkreq.png}{One CHUNK\_REQ in Wireshark with our dissector (capture
+  \code{cap1}, frame 317), annotated by layer. Selected lines of each header are shown; the red box
+  marks our 12-byte header in the packet bytes.}{fig:capture}{0.5\textheight}%
 }{%
   \placeholderfigure{Wireshark screenshot of cap1 frame 317, saved as
   report/figures/capture-chunkreq.png}{One CHUNK\_REQ in Wireshark with the meshsync dissector
