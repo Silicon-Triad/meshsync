@@ -34,12 +34,11 @@ Security & TLS needs a connection, so each datagram carries an HMAC tag and time
 \subsection{Sockets and threads (R2)}
 \label{sec:r2}
 
-\textbf{Sockets only (R2).} meshsync is written in Python 3.11+ with the standard library only.
-Both transports use the \code{socket} module directly, with threads rather than any networking
-framework. The message format, framing, handshake and state machine are all ours. The other modules
-are helpers, not protocols: \code{struct} packs the header, \code{json} encodes bodies,
+\textbf{Sockets only (R2).} meshsync uses Python 3.11+ and the \textbf{standard library only}: both
+transports use \code{socket} directly, with threads and no networking framework. Format, framing,
+handshake and state machine are all ours. Other modules are helpers, not protocols: \code{struct} packs the header, \code{json} encodes bodies,
 \code{hashlib} computes SHA-256, \code{hmac} signs tags and handshakes, and \code{ssl} wraps our own
 TCP sockets in TLS.
 
 \textbf{Threads.} Each connection has one reader thread and a send lock. Replies are matched to
-requests by REQ\_ID, so up to 8 chunk requests per peer are in flight on one connection.
+requests by REQ\_ID, so up to \textbf{8} chunk requests per peer are in flight on one connection.

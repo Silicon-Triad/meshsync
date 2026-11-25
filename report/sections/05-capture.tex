@@ -7,17 +7,16 @@
 \section{Packet capture and encapsulation analysis (R5)}
 \label{sec:capture}
 
-\textbf{Method.} We captured a plain-mode sync of a 100\,MiB file from kratos to defalt with
-\code{tshark} on kratos, keeping the first 256 bytes of each frame. Plain mode is our approved R5
-deviation, since TLS would hide our messages. MAC addresses were anonymised before commit. Our
-Wireshark dissector decodes the meshsync header as its own layer. Figure~\ref{fig:capture} shows one CHUNK\_REQ from defalt.
+\textbf{Method.} We captured a \textbf{plain-mode} sync of a 100\,MiB file from kratos to defalt with
+\code{tshark} (first 256 bytes per frame; plain mode is our approved R5 deviation, as TLS would hide
+our messages; MACs anonymised). Our Wireshark dissector decodes the meshsync header as its own layer. Figure~\ref{fig:capture} shows one CHUNK\_REQ from defalt.
 % tshark -s 256 -f "udp port 47000 or tcp port 47001" on wlp2s0; data/captures/README.md ("How
 % they were taken", "Privacy"); tools/wireshark/README.md (D5).
 % Figure: Wireshark screenshots by Ahmed (2026-11-25), selected detail lines stacked and
 % annotated per layer (layout only; no values changed).
 
 \begin{figure}[H]\centering
-  \IfFileExists{figures/capture-chunkreq.png}{\includegraphics[width=\linewidth]{capture-chunkreq.png}}%
+  \IfFileExists{figures/capture-chunkreq.png}{\includegraphics[width=0.88\linewidth]{capture-chunkreq.png}}%
     {\fbox{\parbox[c][4cm][c]{0.9\linewidth}{\centering\TODO{Wireshark screenshot of cap1 frame 317}}}}
   \caption{One CHUNK\_REQ in Wireshark with our dissector (capture \code{cap1}, frame 317), annotated by
   layer. Selected lines of each header are shown; the red box marks our 12-byte header in the packet
@@ -32,7 +31,7 @@ and our header marks each message's boundary, type and request ID.
 % ack/flags/window_size_value (scale 128)/options, meshsync.* (tshark -V with meshsync.lua).
 
 \textbf{Encapsulation and overhead.} On kratos each header is read and removed by its own layer:
-the frame by the network card, IP and TCP by the kernel, and our header by meshsync. In this small frame 78 of 154 bytes are headers, only 12 of them ours. Over the
-whole 100\,MiB transfer our messages added 0.21\,\% and all headers 5.98\,\%.
+the frame by the network card, IP and TCP by the kernel, and our header by meshsync. In this frame \textbf{78 of 154 bytes} are headers, only \textbf{12} ours. Over the
+whole 100\,MiB transfer our messages added \textbf{0.21\,\%} and all headers \textbf{5.98\,\%}.
 % cap1 frame 225: frame.len 1514, tcp.len 1448, CHUNK_DATA body_len 65558. Whole transfer:
 % data/captures/README.md ("Header and body overhead").

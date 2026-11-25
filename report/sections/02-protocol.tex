@@ -10,10 +10,9 @@
 \section{Protocol specification (R1)}
 \label{sec:protocol}
 
-This is our complete wire protocol in short form; \code{docs/PROTOCOL.md} in the repository adds
-worked examples. Integers are unsigned and big-endian. JSON is UTF-8. A \code{peer\_id} is 8
+Our complete wire protocol in short form (\code{docs/PROTOCOL.md} adds examples). Integers are unsigned and big-endian. JSON is UTF-8. A \code{peer\_id} is 8
 uppercase hex characters; all other hex values are lowercase. \code{K} is the group's 32-byte
-shared secret. It never crosses the wire. All peers are equal. On a TCP connection the side that
+shared secret; it never crosses the wire. On a TCP connection the side that
 dials is the \emph{initiator} (I); only the lower \code{peer\_id} dials, so each pair has one link.
 
 \subsection{Discovery datagram (UDP)}
@@ -23,8 +22,8 @@ Each datagram is one JSON object of at most 512 bytes with exactly nine fields: 
 (\code{"MS"}), \code{ver} (1), \code{type} (\code{"ANNOUNCE"} or \code{"LEAVE"}), \code{peer\_id},
 \code{name}, \code{tcp\_port}, \code{index\_rev}, \code{ts} (Unix seconds) and \code{tag}. The tag is
 the HMAC-SHA256 under \code{K} of the other eight fields, written as canonical JSON (keys sorted,
-no spaces). Figure~\ref{fig:discovery} shows how a datagram is sent and checked. A receiver applies
-the five checks in order and silently drops the datagram at the first that fails.
+no spaces). A receiver applies the \textbf{five checks} of Figure~\ref{fig:discovery} in order and
+silently drops the datagram at the first that fails.
 
 \begin{figure}[H]\centering
   \scalebox{0.85}{\input{../docs/diagrams/discovery-g2.tex}}
@@ -35,7 +34,7 @@ the five checks in order and silently drops the datagram at the first that fails
 \subsection{TCP framing}
 \label{sec:proto-framing}
 
-Every TCP message is a 12-byte header (Table~\ref{tab:header}) and a body. The reader takes
+Every TCP message is a \textbf{12-byte header} (Table~\ref{tab:header}) and a body. The reader takes
 exactly 12 bytes, checks the fields in table order, then reads BODY\_LEN bytes. Every failed check
 is fatal. A body must have exactly the keys listed for its type.
 
@@ -70,7 +69,7 @@ Table~\ref{tab:msg-formats} lists every TCP message. Codes 0x01--0x04 are legal 
 handshake, ERROR at any time, the rest after it. Nonces are 16 random bytes in hex. An
 index entry has exactly \code{path}, \code{size}, \code{file\_hash}, \code{chunks} (the SHA-256 of
 each chunk), \code{version} (\code{peer\_id} $\rightarrow$ counter) and \code{deleted}. A peer keeps
-at most 8 CHUNK\_REQs outstanding per peer and sends PING every 10\,s.
+at most \textbf{8 CHUNK\_REQs} outstanding per peer and sends PING every \textbf{10\,s}.
 
 \begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.17\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.23\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.36\linewidth-2\tabcolsep\relax}}
 \caption{Protocol message formats and action on receipt. Dir/ID: who sends it, and whether REQ\_ID marks a request, a reply or neither (0).}\label{tab:msg-formats}\\
@@ -103,8 +102,8 @@ at most 8 CHUNK\_REQs outstanding per peer and sends PING every 10\,s.
 \subsection{Legal message order}
 \label{sec:proto-order}
 
-Figure~\ref{fig:protocol} shows the order of messages on a new connection and the states it
-passes through. The handshake must finish within 10\,s. A valid message with no handler gets ERROR
+Figure~\ref{fig:protocol} shows the message order and states of a new connection. The handshake
+must finish within \textbf{10\,s}. A valid message with no handler gets ERROR
 INTERNAL and the link stays open; a reply that matches no request is ignored. If both peers dial
 each other, both keep the link whose initiator has the lower \code{peer\_id}.
 
@@ -150,6 +149,6 @@ open. CHUNK\_CORRUPT and BUSY are reserved and not sent yet.
 $\mathit{mac\_r} = \mathrm{HMAC}(K, \mbox{\code{R}} \,\|\, \mathit{nonce\_i} \,\|\, \mathit{nonce\_r})$ and
 $\mathit{mac\_i} = \mathrm{HMAC}(K, \mbox{\code{I}} \,\|\, \mathit{nonce\_r} \,\|\, \mathit{nonce\_i})$,
 over the raw nonce bytes. The role letter stops a MAC being sent back as the other side's proof,
-and fresh nonces stop replay. \textbf{TLS mode} (\code{--tls}) runs TLS~1.3 with certificates from a
+and fresh nonces stop replay. \textbf{TLS mode} (\code{--tls}) runs \textbf{TLS~1.3} with certificates from a
 group CA on both sides, before HELLO. After the handshake each side checks that the certificate's
-name matches the peer's HELLO name. Plain mode exists only for the capture and as a baseline.
+name matches the peer's HELLO name.

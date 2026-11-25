@@ -13,14 +13,13 @@
 \section{Behaviour under failure (R7)}
 \label{sec:failure}
 
-\textbf{Peer killed mid-transfer.} \emph{Designed:} the transfer survives and the file completes.
-\emph{What happened:} we killed defalt (\code{kill -9}) while it received the 100\,MiB file from
-kratos. Its kernel closed the connection at once (FIN, frame 48679, then 421 RSTs), and kratos logged
-\code{peer down: defalt}. After the restart the handshake ran again (frame 49223) and defalt logged
-\code{fetching large.bin: 633 of 1403 chunks}: the 770 it had were kept, and the file assembled
-correctly. With three peers the other peer supplies the chunks; a localhost test shows this.
+\textbf{Peer killed mid-transfer.} \emph{Designed:} the transfer \textbf{survives} and the file completes.
+\emph{Result:} we killed defalt (\code{kill -9}) while it received the 100\,MiB file from
+kratos. Its kernel closed the link at once (FIN, frame 48679) and kratos logged \code{peer down}. After the
+restart (handshake, frame 49223) defalt fetched \textbf{633 of 1403} chunks, keeping the \textbf{770} it
+had, and the file assembled correctly.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.52\linewidth-2\tabcolsep\relax}}
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.25\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.22\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.53\linewidth-2\tabcolsep\relax}}
 \caption{Other failure scenarios (frames from our captures).}\label{tab:failures}\\
 \toprule
 \colhead{Scenario} & \colhead{Designed behaviour} & \colhead{Evidence} \\
@@ -33,9 +32,9 @@ correctly. With three peers the other peer supplies the chunks; a localhost test
 \endhead
 \bottomrule
 \endlastfoot
-Wrong secret, spoofed or replayed ANNOUNCE & Dropped; ERROR 0x04, close & \code{cap2}: ANNOUNCEs dropped as \code{bad tag} (replays as \code{replay ts}), so no TCP at all. Forced with a static peer (\code{cap2b}): HELLO (6), HELLO\_ACK (8), ERROR \code{AUTH\_FAILED: bad mac\_r} (10), both close. \\
-Untrusted certificate & TLS alert, close & \code{cap3}: Client Hello (frame 7), Server Hello (9), fatal alert \emph{Unknown CA} (14). No meshsync message is ever sent. \\
-5\,\% packet loss & Completes, more slowly & \code{cap5}: 402 of 7\,935 data segments retransmitted (5.1\,\%), 715 duplicate ACKs. The 10\,MiB file arrived intact. \\
-Concurrent edits; peer offline, then rejoins & Conflict copy; catch-up by index exchange & Localhost tests in CI only (\code{tests/integration}). \\
+Wrong secret, spoofed or replayed & Dropped; ERROR 0x04 & \code{cap2}: ANNOUNCEs dropped, no TCP; static peer (\code{cap2b}): \code{AUTH\_FAILED} (frame 10). \\
+Untrusted certificate & TLS alert, close & \code{cap3}: alert \emph{Unknown CA} (frame 14); no meshsync message. \\
+5\,\% packet loss & Completes, slower & \code{cap5}: \textbf{402 of 7\,935} segments resent (5.1\,\%), 715 dup ACKs; file intact. \\
+Concurrent edits; offline rejoin & Conflict copy; index catch-up & Localhost tests in CI only (\code{tests/integration}). \\
 Corrupt chunk & Re-request from another peer & Designed, not yet tested. \\
 \end{reptable}

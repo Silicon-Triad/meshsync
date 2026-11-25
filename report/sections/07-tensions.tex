@@ -8,16 +8,14 @@
 
 \begin{itemize}[leftmargin=*,itemsep=1pt,topsep=2pt]
   \item \textbf{Reliability vs latency.} \emph{Position:} TCP for all data, UDP only for discovery.
-  \emph{Defence:} under 5\,\% loss every copy still arrived complete, only 2.1 times slower; FTP
-  slowed 2.3 times, so this is TCP's price, not our design's (Table~\ref{tab:experiments}). For a
-  synchroniser a corrupt file is a failure; a slow one is not.
+  \emph{Defence:} under 5\,\% loss every copy arrived complete, \textbf{2.1 times} slower; FTP slowed
+  \textbf{2.3 times}, so it is TCP's price (Table~\ref{tab:experiments}). A corrupt file fails; a slow one does not.
   \item \textbf{Security vs performance.} \emph{Position:} HMAC authentication always, TLS~1.3
-  optional. \emph{Defence:} TLS cost nothing measurable, as the Wi-Fi, not the CPU, is the bottleneck.
-  FTP sent its user name and password in plain text (frames 6 and 9); our handshake sends only nonces
-  and MACs.
+  optional. \emph{Defence:} TLS cost \textbf{nothing measurable}, as the Wi-Fi, not the CPU, is the bottleneck.
+  FTP sent its password in \textbf{plain text} (frame 9); we send only nonces and MACs.
   \item \textbf{Compactness vs readability.} \emph{Position:} a 12-byte binary header, JSON for
-  control messages. \emph{Defence:} the header is 0.016\,\% of a 100\,MiB transfer
-  (Section~\ref{sec:capture}). JSON costs more: after a 1\,KiB edit the index entry was over half of
-  the 172\,KB sent, yet that still beats a full copy 600 times over and stays readable.
+  control messages. \emph{Defence:} the header is \textbf{0.016\,\%} of a 100\,MiB transfer
+  (Section~\ref{sec:capture}). JSON costs more (over half of the 172\,KB sent after an edit), yet still beats a full
+  copy \textbf{600 times} over and stays readable.
 \end{itemize}
 % savings.md: delta all bytes 171,836, chunk 75,667; 105,183,306 / 171,836 = 612.

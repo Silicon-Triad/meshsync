@@ -10,11 +10,8 @@
 
 \begin{itemize}[leftmargin=*,itemsep=1pt,topsep=2pt]
   \item \textbf{Bytes saved:} after a 1\,KiB edit to the 100\,MiB file, 171\,836 bytes instead of
-  105\,183\,306, counting all traffic: 99.84\,\% less (99.85\,\% for chunking after an insert).
+  105\,183\,306, counting all traffic: \textbf{99.84\,\% less} (99.85\,\% for chunking after an insert).
   \item \textbf{At scale (illustration):} 10\,000 users making 20 such edits a day, each to one peer,
-  is 34\,GB a day instead of 21\,037\,GB: about 7.67\,PB a year saved.
-  \item \textbf{Energy:} at 0.06\,kWh per GB (Aslan et al., 2015 estimate \refcite{1}), about
-  1\,260\,kWh a day, or 460\,MWh a year. Orders of magnitude only: few edits touch 100\,MiB files.
-  \item \textbf{Counter-weight:} CPU we did not measure, hashing every scanned file and a rolling
-  hash over every byte.
+  move 34\,GB a day instead of 21\,037\,GB: \textbf{7.67\,PB a year} saved, or \textbf{460\,MWh a year} at
+  0.06\,kWh/GB (Aslan et al., 2015 \refcite{1}). Orders of magnitude only; unmeasured hashing CPU counts against it.
 \end{itemize}

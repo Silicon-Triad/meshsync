@@ -17,7 +17,7 @@ router at 192.168.100.1 (Figure~\ref{fig:network}, Table~\ref{tab:ip-plan}), the
 \end{figure}
 
 \begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.15\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.17\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.2\linewidth-2\tabcolsep\relax}}
-\caption{IP plan and host configuration (all hosts listen on UDP 47000, TCP 47001).}\label{tab:ip-plan}\\
+\caption{IP plan and host configuration, as captured with \code{ip -4 addr} (all hosts listen on UDP 47000, TCP 47001).}\label{tab:ip-plan}\\
 \toprule
 \colhead{Host} & \colhead{TCP role} & \colhead{Address (iface)} & \colhead{OS, Python} & \colhead{Firewall} \\
 \midrule
@@ -34,16 +34,8 @@ minipc (mini PC) & accepts kratos, dials defalt & 192.168.100.190/24, static (\c
 defalt (laptop) & accepts both & 192.168.100.80/24, DHCP (\code{wlp4s0}) & Ubuntu 20.04.6, Linux 5.15.0; Python 3.11.18 & none \\
 \end{reptable}
 
-The IP configuration as captured with \code{ip -4 addr} (one line per host):
-\begin{verbatim}
-kratos: inet 192.168.100.92/24 brd 192.168.100.255 ... wlp2s0
-minipc: inet 192.168.100.190/24 brd 192.168.100.255 ... wlp2s0
-defalt: inet 192.168.100.80/24 brd 192.168.100.255 ... wlp4s0
-\end{verbatim}
-% data/deploy/<host>/host.txt ("## ip -4 addr"), host name prefixed, flags shortened to "...".
-
 \textbf{Run.} Each host ran \code{meshsync run}, first in plain mode and then with TLS, with no
-static peers, so UDP discovery found every connection. All three links reached SYNCED in both modes
+static peers, so UDP discovery found every connection. \textbf{All three links reached SYNCED} in both modes
 (\code{handshake ok \ldots{} SYNCED} in every host's log), and creates, edits and deletes reached
 every host.
 % data/deploy/minipc/plain.log (lines quoted, prefixes shortened); data/deploy/README.md
