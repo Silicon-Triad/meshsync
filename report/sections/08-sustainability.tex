@@ -8,10 +8,13 @@
 \section{Sustainability and efficiency analysis}
 \label{sec:sustainability}
 
-After a 1\,KiB edit to the 100\,MiB file, meshsync received 171\,836 bytes where a full copy took
-105\,183\,306, counting all traffic. That is a 99.84\,\% saving (99.85\,\% for chunking after an insert). We assume, as an illustration, 10\,000 users each making 20 such edits a
-day, each sent to one peer: 200\,000 edits a day. Full copies would move 21\,037\,GB a day; delta sync
-moves 34\,GB. The saving is about 21\,000\,GB a day, or 7.67\,PB a year. At 0.06\,kWh per GB, the 2015
-estimate of Aslan et al.\ \refcite{1}, that is about 1\,260\,kWh a day, or 460\,MWh a year. These are
-orders of magnitude only: few edits touch 100\,MiB files, and the energy figure is from 2015. Against it stands CPU work we did not measure:
-hashing every scanned file, and a rolling hash over every byte.
+\begin{itemize}[leftmargin=*,itemsep=1pt,topsep=2pt]
+  \item \textbf{Bytes saved:} after a 1\,KiB edit to the 100\,MiB file, 171\,836 bytes instead of
+  105\,183\,306, counting all traffic: 99.84\,\% less (99.85\,\% for chunking after an insert).
+  \item \textbf{At scale (illustration):} 10\,000 users making 20 such edits a day, each to one peer,
+  is 34\,GB a day instead of 21\,037\,GB: about 7.67\,PB a year saved.
+  \item \textbf{Energy:} at 0.06\,kWh per GB (Aslan et al., 2015 estimate \refcite{1}), about
+  1\,260\,kWh a day, or 460\,MWh a year. Orders of magnitude only: few edits touch 100\,MiB files.
+  \item \textbf{Counter-weight:} CPU we did not measure, hashing every scanned file and a rolling
+  hash over every byte.
+\end{itemize}

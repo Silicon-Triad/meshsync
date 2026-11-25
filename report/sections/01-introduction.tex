@@ -6,21 +6,15 @@
 \section{Introduction and the option selected}
 \label{sec:intro}
 
-meshsync keeps one shared folder identical on three Linux hosts, with no central server. When a
-file is created, edited or deleted on one host, the others have the change within seconds. Every
-host runs the same program as an equal peer.
-
-Option~E of the brief asks for file distribution, client-server against peer-to-peer. We chose a
-custom option that extends it: a peer-to-peer synchroniser with our own application-layer protocol,
-written directly on sockets. Peers find each other by UDP broadcast and use TCP for everything else.
-We did not measure how distribution time grows with the number of receivers. Instead,
-Section~\ref{sec:ftp} compares meshsync with FTP, a client-server protocol, on the same hosts.
-
-Each main feature fixes a gap in an existing protocol. Only changed chunks travel, where FTP
-resends the whole file, and content-defined chunking keeps this true after an insert. A request ID
-lets replies arrive in any order on one connection, unlike HTTP/1.1. Many peers stay in sync
-continuously, where rsync links two hosts once. An HMAC handshake proves the shared secret without
-sending it, where FTP sends the password in clear.
+meshsync keeps one shared folder identical on three Linux hosts, with no central server: every
+host is an equal peer, and a change on one reaches the others within seconds. We chose a custom
+option extending Option~E (file distribution): a peer-to-peer synchroniser with our own protocol on
+sockets, UDP broadcast for discovery and TCP for everything else. Instead of a scaling study,
+Section~\ref{sec:ftp} compares it with FTP, a client-server protocol, on the same hosts. Each
+feature fixes a gap in an existing protocol: only changed chunks travel, unlike FTP, even after an
+insert (content-defined chunking); request IDs allow out-of-order replies, unlike HTTP/1.1; many peers
+stay in sync continuously, unlike rsync; and an HMAC handshake never sends the secret, unlike FTP's
+clear-text password.
 
 \paragraph{Approved deviations.} From our approved proposal, quoted verbatim:
 

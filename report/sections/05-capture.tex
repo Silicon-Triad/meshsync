@@ -31,18 +31,8 @@ and our header marks each message's boundary, type and request ID.
 % cap1 frame 317: eth.dst/src/type, ip.src/dst/len/ttl/proto/flags.df, tcp.srcport/dstport/seq/
 % ack/flags/window_size_value (scale 128)/options, meshsync.* (tshark -V with meshsync.lua).
 
-\textbf{Encapsulation.} Each layer wraps the one above in its own header (Figure~\ref{fig:encap}).
-On kratos each header is read by the matching layer and removed: the frame by the network card,
-IP and TCP by the kernel, and our header by meshsync. Only the link header changes from hop to hop.
-
-\begin{figure}[H]\centering
-  \input{../docs/diagrams/encapsulation-g2.tex}
-  \caption{Encapsulation of the CHUNK\_REQ in frame 317, in bytes. Grey: each layer's header.}
-  \label{fig:encap}
-\end{figure}
-% Sizes: frame.len 154, ip.len 140, tcp.hdr_len 32, tcp.len 88, meshsync.body_len 76.
-
-\textbf{Overhead.} In this small frame 78 of 154 bytes are headers, only 12 of them ours. Over the
+\textbf{Encapsulation and overhead.} On kratos each header is read and removed by its own layer:
+the frame by the network card, IP and TCP by the kernel, and our header by meshsync. In this small frame 78 of 154 bytes are headers, only 12 of them ours. Over the
 whole 100\,MiB transfer our messages added 0.21\,\% and all headers 5.98\,\%.
 % cap1 frame 225: frame.len 1514, tcp.len 1448, CHUNK_DATA body_len 65558. Whole transfer:
 % data/captures/README.md ("Header and body overhead").
