@@ -22,15 +22,8 @@ restarted, the handshake ran again (frame 49223), and defalt logged
 again, and the file was assembled correctly. With three peers, the missing chunks go to the other
 peer instead; a localhost test shows this.
 
-\textbf{Wrong secret.} \emph{Designed:} the peer is rejected with ERROR 0x04 and the link closes.
-\emph{What happened:} the check fails twice. First, each ANNOUNCE has a bad tag, so defalt drops it
-(\code{drop D5A6E688 ... bad tag}) and never connects: the capture has no TCP traffic at all. When we
-forced a connection with a static peer, the handshake failed: HELLO (frame 6), HELLO\_ACK (8), then
-ERROR \code{\{"code": 4, "msg": "AUTH\_FAILED: bad mac\_r"\}} (10), and both sides closed. The secret
-never crossed the wire.
-
 \begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.52\linewidth-2\tabcolsep\relax}}
-\caption{Other failure scenarios.}\label{tab:failures}\\
+\caption{Other failure scenarios (frames from our captures).}\label{tab:failures}\\
 \toprule
 \colhead{Scenario} & \colhead{Designed behaviour} & \colhead{Evidence} \\
 \midrule
@@ -42,6 +35,7 @@ never crossed the wire.
 \endhead
 \bottomrule
 \endlastfoot
+Wrong secret & ERROR 0x04, close & \code{cap2}: ANNOUNCEs dropped as \code{bad tag}, so no TCP at all. Forced with a static peer (\code{cap2b}): HELLO (6), HELLO\_ACK (8), ERROR \code{AUTH\_FAILED: bad mac\_r} (10), both close. \\
 Untrusted certificate & TLS alert, close & \code{cap3}: Client Hello (frame 7), Server Hello (9), fatal alert \emph{Unknown CA} (14). No meshsync message is ever sent. \\
 5\,\% packet loss & Completes, more slowly & \code{cap5}: 402 of 7\,935 data segments retransmitted (5.1\,\%), 715 duplicate ACKs. The 10\,MiB file arrived intact. \\
 Replayed ANNOUNCE & Dropped & defalt log: \code{drop ... replay ts 1794662842}. Also a localhost test. \\

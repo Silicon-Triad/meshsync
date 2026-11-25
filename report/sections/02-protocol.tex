@@ -7,23 +7,14 @@
 % HANDSHAKE_TIMEOUT 10, PING_INTERVAL 10, MAX_MISSED_PONGS 3, MAX_OUTSTANDING_PER_PEER 8,
 % CDC_MAX 256 KiB. PROTOCOL.md sections: §1 conventions, §3 discovery, §4 framing, §5 messages,
 % §6 setup, §7 states, §8 peers, §10 errors. Decisions: (a), (c), (e), (g), (h), (i), (j), (m).
-\newpage
 \section{Protocol specification (R1)}
 \label{sec:protocol}
 
 This is our complete wire protocol in short form; \code{docs/PROTOCOL.md} in the repository adds
 worked examples. Integers are unsigned and big-endian. JSON is UTF-8. A \code{peer\_id} is 8
 uppercase hex characters; all other hex values are lowercase. \code{K} is the group's 32-byte
-shared secret. It never crosses the wire.
-
-\subsection{Overview}
-\label{sec:proto-overview}
-
-All peers are equal; there is no server. On each TCP connection, the side that dials is the
-\emph{initiator} (I) and the other is the \emph{responder} (R). Only the peer with the lower
-\code{peer\_id} dials, so each pair has one connection. Discovery uses UDP broadcast on port 47000;
-everything else uses TCP port 47001, optionally inside TLS~1.3. A closed connection is redialled
-every 5\,s while the peer is still known.
+shared secret. It never crosses the wire. All peers are equal. On a TCP connection the side that
+dials is the \emph{initiator} (I); only the lower \code{peer\_id} dials, so each pair has one link.
 
 \subsection{Discovery datagram (UDP)}
 \label{sec:proto-discovery}
@@ -35,7 +26,7 @@ the HMAC-SHA256 under \code{K} of the other eight fields, written as canonical J
 no spaces). Figure~\ref{fig:discovery} shows how a datagram is sent and checked. A receiver applies
 the five checks in order and silently drops the datagram at the first that fails.
 
-\begin{figure}[!htbp]\centering
+\begin{figure}[H]\centering
   \input{../docs/diagrams/discovery-g2.tex}
   \caption{UDP discovery: the receiver's checks in order, the peer table and the dial rule.}
   \label{fig:discovery}
@@ -83,35 +74,34 @@ index entry has exactly \code{path}, \code{size}, \code{file\_hash}, \code{chunk
 each chunk), \code{version} (\code{peer\_id} $\rightarrow$ counter) and \code{deleted}. A peer keeps
 at most 8 CHUNK\_REQs outstanding per peer and sends PING every 10\,s.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.22\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.215\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.385\linewidth-2\tabcolsep\relax}}
-\caption{Protocol message formats and action on receipt.}\label{tab:msg-formats}\\
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.17\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.23\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.36\linewidth-2\tabcolsep\relax}}
+\caption{Protocol message formats and action on receipt. Dir/ID: who sends it, and whether REQ\_ID marks a request, a reply or neither (0).}\label{tab:msg-formats}\\
 \toprule
-\colhead{Code, name} & \colhead{Dir} & \colhead{REQ} & \colhead{Body} & \colhead{Action on receipt} \\
+\colhead{Code, name} & \colhead{Dir / ID} & \colhead{Body} & \colhead{Action on receipt} \\
 \midrule
 \endfirsthead
-\multicolumn{5}{@{}l}{\tablecontinued}\\
+\multicolumn{4}{@{}l}{\tablecontinued}\\
 \toprule
-\colhead{Code, name} & \colhead{Dir} & \colhead{REQ} & \colhead{Body} & \colhead{Action on receipt} \\
+\colhead{Code, name} & \colhead{Dir / ID} & \colhead{Body} & \colhead{Action on receipt} \\
 \midrule
 \endhead
 \bottomrule
 \endlastfoot
-0x01 HELLO & I$\rightarrow$R & 0 & \code{peer\_id}, \code{name}, \code{proto\_ver}, \code{nonce\_i} & \code{proto\_ver}~$\neq$~1: BAD\_VERSION. Own \code{peer\_id}: AUTH\_FAILED. Else reply HELLO\_ACK \\
-0x02 HELLO\_ACK & R$\rightarrow$I & 0 & \code{peer\_id}, \code{name}, \code{nonce\_r}, \code{mac\_r} & Own \code{peer\_id} or wrong \code{mac\_r}: AUTH\_FAILED. Else send AUTH \\
-0x03 AUTH & I$\rightarrow$R & 0 & \code{mac\_i} & Wrong \code{mac\_i}: AUTH\_FAILED. Else send AUTH\_OK \\
-0x04 AUTH\_OK & R$\rightarrow$I & 0 & \{\} & Connection is AUTHENTICATED \\
-0x10 INDEX\_REQ & both & Req & \{\} & Reply INDEX \\
-0x11 INDEX & both & Reply & \code{index\_rev}, \code{files} & Compare each entry with the local one; then SYNCED \\
-0x12 NOTIFY & both & 0 & \code{entry} & Compare the entry; no reply \\
-0x20 CHUNK\_REQ & both & Req & \code{hash} & Reply CHUNK\_DATA, or ERROR CHUNK\_NOT\_FOUND \\
-0x21 CHUNK\_DATA & both & Reply & raw bytes, $\le$\,256\,KiB & Store if SHA-256 matches; else ask another peer \\
-0x30 PING & both & Req & \code{t} & Reply PONG with the same REQ\_ID and \code{t} \\
-0x31 PONG & both & Reply & \code{t} & Record RTT; reset missed-PONG count \\
-0x7E ERROR & both & Reply or 0 & \code{code}, \code{msg} & Fail the matching request; close if fatal; never reply \\
-0x7F BYE & both & 0 & \code{reason} & Close without replying \\
+0x01 HELLO & I$\rightarrow$R / 0 & \code{peer\_id}, \code{name}, \code{proto\_ver}, \code{nonce\_i} & Bad version: BAD\_VERSION; own ID: AUTH\_FAILED; else HELLO\_ACK \\
+0x02 HELLO\_ACK & R$\rightarrow$I / 0 & \code{peer\_id}, \code{name}, \code{nonce\_r}, \code{mac\_r} & Own ID or bad MAC: AUTH\_FAILED; else AUTH \\
+0x03 AUTH & I$\rightarrow$R / 0 & \code{mac\_i} & Bad MAC: AUTH\_FAILED; else AUTH\_OK \\
+0x04 AUTH\_OK & R$\rightarrow$I / 0 & \{\} & Now AUTHENTICATED \\
+0x10 INDEX\_REQ & both / Req & \{\} & Reply INDEX \\
+0x11 INDEX & both / Reply & \code{index\_rev}, \code{files} & Compare entries; now SYNCED \\
+0x12 NOTIFY & both / 0 & \code{entry} & Compare the entry \\
+0x20 CHUNK\_REQ & both / Req & \code{hash} & CHUNK\_DATA or CHUNK\_NOT\_FOUND \\
+0x21 CHUNK\_DATA & both / Reply & raw, $\le$\,256\,KiB & Keep if SHA-256 matches \\
+0x30 PING & both / Req & \code{t} & Reply PONG, same \code{t} \\
+0x31 PONG & both / Reply & \code{t} & Record RTT \\
+0x7E ERROR & both / either & \code{code}, \code{msg} & Fail request; close if fatal \\
+0x7F BYE & both / 0 & \code{reason} & Close, no reply \\
 \end{reptable}
 
-\newpage
 \subsection{Legal message order}
 \label{sec:proto-order}
 
@@ -120,7 +110,7 @@ passes through. The handshake must finish within 10\,s. A valid message with no 
 INTERNAL and the link stays open; a reply that matches no request is ignored. If both peers dial
 each other, both keep the link whose initiator has the lower \code{peer\_id}.
 
-\begin{figure}[!htbp]\centering
+\begin{figure}[H]\centering
   \input{../docs/diagrams/protocol-g2.tex}
   \caption{Connection setup (left) and connection states (right). Dashed: TLS mode only.}
   \label{fig:protocol}
@@ -129,32 +119,30 @@ each other, both keep the link whose initiator has the lower \code{peer\_id}.
 \subsection{Error codes}
 \label{sec:proto-errors}
 
-An ERROR body is \code{\{"code": int, "msg": string\}}. After a fatal error the sender closes the
-connection, and the receiver closes without replying (Table~\ref{tab:errors}). An unknown code is
-itself BAD\_HEADER.
+An ERROR body is \code{\{"code": int, "msg": string\}} (Table~\ref{tab:errors}). BAD\_HEADER covers a
+bad MAGIC, type, body or path; AUTH\_FAILED a bad MAC, a connection to self or a certificate name
+mismatch. After a fatal code the sender closes and the receiver closes without replying.
+CHUNK\_NOT\_FOUND makes the receiver ask another peer; INTERNAL means no handler, and the link stays
+open. CHUNK\_CORRUPT and BUSY are reserved and not sent yet.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.3\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.52\linewidth-2\tabcolsep\relax}}
-\caption{Error codes.}\label{tab:errors}\\
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.29\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.1\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.3\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.13\linewidth-2\tabcolsep\relax}}
+\caption{Error codes (fatal codes close the connection).}\label{tab:errors}\\
 \toprule
-\colhead{Code} & \colhead{Name} & \colhead{Fatal} & \colhead{Sent when} \\
+\colhead{Code} & \colhead{Name} & \colhead{Fatal} & \colhead{Code} & \colhead{Name} & \colhead{Fatal} \\
 \midrule
 \endfirsthead
-\multicolumn{4}{@{}l}{\tablecontinued}\\
+\multicolumn{6}{@{}l}{\tablecontinued}\\
 \toprule
-\colhead{Code} & \colhead{Name} & \colhead{Fatal} & \colhead{Sent when} \\
+\colhead{Code} & \colhead{Name} & \colhead{Fatal} & \colhead{Code} & \colhead{Name} & \colhead{Fatal} \\
 \midrule
 \endhead
 \bottomrule
 \endlastfoot
-0x01 & BAD\_HEADER & yes & Bad MAGIC, TYPE, body or path \\
-0x02 & BAD\_VERSION & yes & VER or \code{proto\_ver} not 1 \\
-0x03 & ILLEGAL\_STATE & yes & Message out of order \\
-0x04 & AUTH\_FAILED & yes & Bad MAC, self, or CN mismatch \\
-0x05 & TOO\_LARGE & yes & Body over 1\,MiB \\
-0x10 & CHUNK\_NOT\_FOUND & no & Chunk not stored; ask another peer \\
-0x11 & CHUNK\_CORRUPT & no & Reserved; not sent yet \\
-0x20 & BUSY & no & Reserved; not sent yet \\
-0x7F & INTERNAL & no & Handler missing or failed \\
+0x01 & BAD\_HEADER & yes & 0x10 & CHUNK\_NOT\_FOUND & no \\
+0x02 & BAD\_VERSION & yes & 0x11 & CHUNK\_CORRUPT & no \\
+0x03 & ILLEGAL\_STATE & yes & 0x20 & BUSY & no \\
+0x04 & AUTH\_FAILED & yes & 0x7F & INTERNAL & no \\
+0x05 & TOO\_LARGE & yes & & & \\
 \end{reptable}
 
 \subsection{Security}

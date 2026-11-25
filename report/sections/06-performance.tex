@@ -17,6 +17,13 @@
 We first measured the network itself between every pair of hosts (Table~\ref{tab:rtt}): round-trip
 time with \code{ping}, meshsync's own PING/PONG, and the TCP throughput ceiling with \code{iperf3}.
 
+\textbf{Reading the RTT with the delay model.} On one LAN, $d_\mathrm{prop}$ and, for a short echo,
+$d_\mathrm{trans}$ are tiny, so the RTT is mostly $d_\mathrm{queue}$: waiting for the shared channel,
+twice per packet via the access point. Echoes ranged from 2.1 to 349\,ms. Traffic \emph{to} minipc
+is slow (57--68\,ms) because its Wi-Fi power saving makes the access point hold frames until it
+wakes. PING/PONG is within 4\,ms of \code{ping} in five of six directions: our extra $d_\mathrm{proc}$.
+% rtt.csv: min(min_ms) 2.077, max(max_ms) 348.817. Power save: data/baseline/README.md.
+
 \begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.28\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.26\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.22\linewidth-2\tabcolsep\relax}}
 \caption{Network baseline, mean $\pm$ sd. \code{ping} and \code{iperf3}: n = 5 runs; PING/PONG: n in brackets.}\label{tab:rtt}\\
 \toprule
@@ -38,23 +45,12 @@ minipc $\rightarrow$ defalt & 17.34 $\pm$ 13.81 & 17.15 $\pm$ 14.62 (21) & 10.45
 defalt $\rightarrow$ minipc & 56.53 $\pm$ 5.61 & 35.98 $\pm$ 20.42 (20) & 10.38 $\pm$ 1.34 \\
 \end{reptable}
 
-\textbf{Reading the RTT with the delay model.} Each hop adds
-$d_\mathrm{nodal} = d_\mathrm{proc} + d_\mathrm{queue} + d_\mathrm{trans} + d_\mathrm{prop}$, and every
-packet crosses the air twice, via the access point. On one LAN, $d_\mathrm{prop}$ is tiny, and so
-is $d_\mathrm{trans}$ for a short echo. So almost all of the RTT is queueing: waiting for the shared
-channel. The fastest echo took 2.1\,ms, yet single echoes reached 349\,ms. Traffic \emph{to} minipc
-is slow (57--68\,ms) while traffic \emph{from} it is fast (14--17\,ms). Its Wi-Fi power saving was on,
-so the access point holds frames until its radio wakes. PING/PONG is within 4\,ms of \code{ping} in
-five of six directions. The small extra is our own $d_\mathrm{proc}$ in Python.
-% rtt.csv: min(min_ms) 2.077, max(max_ms) 348.817. Power save: data/baseline/README.md.
-
 \subsection{Experiments}
 \label{sec:experiments}
 
 kratos sent a 100\,MiB file to minipc and defalt, five times per condition (18--19 November).
 For delta and CDC we then changed 1\,KiB of it. Loss and delay were added on kratos with
-\code{tc netem}. Table~\ref{tab:experiments} shows the results; Figures~\ref{fig:throughput}
-and~\ref{fig:exp-impaired} show throughput and the effect of the link.
+\code{tc netem}. Table~\ref{tab:experiments} shows the results and Figure~\ref{fig:throughput} the throughput.
 
 \begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.3\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.18\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.26\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.26\linewidth-2\tabcolsep\relax}}
 \caption{Experiment results, mean $\pm$ sd over n = 5 runs (100\,MiB file, two receivers).}\label{tab:experiments}\\
@@ -73,8 +69,6 @@ Full copy vs delta & full & 227.5 $\pm$ 75.0 & 104\,874\,436 \\
  & delta & 5.2 $\pm$ 10.9 & 75\,667 \\
 Fixed vs CDC, after insert & fixed & 143.1 $\pm$ 49.6 & 104\,877\,836 \\
  & CDC & 0.30 $\pm$ 0.41 & 66\,594 \\
-Number of sources & one & 73.3 $\pm$ 30.9 & 104\,894\,652 \\
- & two & 66.1 $\pm$ 10.2 & 104\,874\,436 \\
 Link & clean & 116.4 $\pm$ 33.6 & 104\,874\,436 \\
  & 5\,\% loss & 474.2 $\pm$ 143.7 & 104\,874\,436 \\
  & +50\,ms delay & 118.8 $\pm$ 27.1 & 104\,874\,436 \\
@@ -82,20 +76,20 @@ Security & plain & 102.9 $\pm$ 16.8 & 104\,874\,436 \\
  & TLS & 90.8 $\pm$ 19.6 & 105\,160\,119 \\
 \end{reptable}
 
-\begin{figure}[!htbp]\centering
+\begin{figure}[H]\centering
   \begin{minipage}[t]{0.48\linewidth}\centering
-    \fitgraphic[0.25\textheight]{throughput-ceiling.pdf}
+    \fitgraphic[0.24\textheight]{throughput-ceiling.pdf}
     \caption{Throughput per condition ($\pm$1 sd) against the \code{iperf3} ceiling from kratos.}
     \label{fig:throughput}
   \end{minipage}\hfill
   \begin{minipage}[t]{0.48\linewidth}\centering
-    \fitgraphic[0.25\textheight]{exp-impaired.pdf}
-    \caption{Transfer time: clean, 5\,\% loss, +50\,ms delay.}
-    \label{fig:exp-impaired}
+    \fitgraphic[0.24\textheight]{ftp-bytes.pdf}
+    \caption{Bytes received after a 1\,KiB edit: FTP vs meshsync (log scale).}
+    \label{fig:ftp-bytes}
   \end{minipage}
 \end{figure}
 % throughput-ceiling.pdf, ftp-bytes.pdf: report/figures/make_figures.py (analyze.py statistics on
-% data/, data/ftp/, and data/baseline/summary.csv). exp-impaired.pdf: analysis/out/impaired.pdf.
+% data/, data/ftp/, and data/baseline/summary.csv).
 
 \textbf{Representative operation and throughput.} On the clean link the 100\,MiB sync took
 $116.4 \pm 33.6$\,s, about 8.2\,Mbit/s: 50--58\,\% of the \code{iperf3} ceiling from kratos
@@ -103,66 +97,39 @@ $116.4 \pm 33.6$\,s, about 8.2\,Mbit/s: 50--58\,\% of the \code{iperf3} ceiling 
 one channel, and meshsync adds per-chunk requests and hashing. FTP, a single plain stream, reached
 about 9.8\,Mbit/s.
 
-\textbf{What dominates.} For a full copy, $d_\mathrm{trans}$ dominates: 105\,MB at about 1\,MB/s takes
-about 100\,s, while a round trip takes milliseconds. After a 1\,KiB edit only 66--76\,KB travel, so
+\textbf{What dominates.} For a full copy $d_\mathrm{trans}$ does: 105\,MB at about 1\,MB/s takes
+100\,s, a round trip milliseconds. After a 1\,KiB edit only 66--76\,KB travel, so
 $d_\mathrm{trans}$ almost disappears and the sync takes under 1.4\,s in nine of ten runs. 5\,\% loss made
 the copy 4.1 times slower here, because TCP resends and slows down; on a calmer night the slowdown
 was 2.1 times (Section~\ref{sec:ftp}). 50\,ms of extra delay changed nothing: at 1\,MB/s it needs
-only 52\,KB in flight, and our 8 outstanding requests keep about 524\,KB in flight. Two sources gave
-no clear gain, because both share the same air time. TLS showed no measurable cost; encryption adds
+only 52\,KB in flight, and our 8 outstanding requests keep about 524\,KB in flight. Fetching from two sources
+instead of one gave no clear gain ($66.1 \pm 10.2$ vs $73.3 \pm 30.9$\,s), as both share the air time. TLS showed no measurable cost; encryption adds
 little $d_\mathrm{proc}$ next to $d_\mathrm{trans}$.
 % 104874436/1.031e6 = 102 s; 474.2/116.4 = 4.07; 1.031e6 x 0.05 = 51,550 B; 8 x 64 KiB = 524,288 B;
 % 1.031 x 8 = 8.25 Mbit/s vs 14.29/16.58. Delta/CDC runs over 1.4 s: delta run 4 only.
 
-\textbf{Anomalies.} (1) The same full copy took 103--228\,s in different conditions of one batch.
-defalt's Wi-Fi was losing packets that night and its power saving was switched off part-way. Byte
-counts did not change. (2) One delta run took 22--28\,s while the others took under 1\,s; the logs
-do not show why. (3) TLS received slightly more bytes than the file, from duplicate chunk fetches.
+\textbf{Anomalies.} The same full copy took 103--228\,s across conditions of one batch, because
+defalt's Wi-Fi was losing packets that night; byte counts did not change. One delta run took
+22--28\,s for no reason the logs show. TLS received a few duplicate chunks.
 % data/README.md (25-83 % ping loss to defalt); data/full_delta/run4.csv; data/tls/run5.csv.
 
-\textbf{Limitations.} One Wi-Fi network whose quality changed during the batch, so small time
-differences mean ``no clear effect''. Only five runs per condition. Times have a 0.5\,s polling step.
-The chunk-size and wired conditions were not run.
+\textbf{Limitations.} One Wi-Fi network of changing quality, five runs per condition, a 0.5\,s
+timing step, and no chunk-size or wired test.
 
 \subsection{Comparison with FTP}
 \label{sec:ftp}
 
 We measured FTP on the same hosts and files (21 November): kratos ran an FTP server and both
-receivers downloaded at once. meshsync's link test was rerun right after, so the times compare
-fairly (Table~\ref{tab:ftp}).
+receivers downloaded at once (n = 5). meshsync's link test was rerun right after, so the times
+compare fairly.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.2\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.17\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.2\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.19\linewidth-2\tabcolsep\relax}}
-\caption{FTP vs meshsync on the same hosts (mean $\pm$ sd, n = 5).}\label{tab:ftp}\\
-\toprule
-\colhead{Case} & \colhead{FTP time (s)} & \colhead{FTP bytes} & \colhead{meshsync time (s)} & \colhead{meshsync bytes} \\
-\midrule
-\endfirsthead
-\multicolumn{5}{@{}l}{\tablecontinued}\\
-\toprule
-\colhead{Case} & \colhead{FTP time (s)} & \colhead{FTP bytes} & \colhead{meshsync time (s)} & \colhead{meshsync bytes} \\
-\midrule
-\endhead
-\bottomrule
-\endlastfoot
-Full file, clean & 106.5 $\pm$ 32.5 & 104\,857\,600 & 162.8 $\pm$ 14.0$^{a}$ & 104\,874\,436 \\
-Full file, 5\,\% loss & 248.9 $\pm$ 56.2 & 104\,857\,600 & 346.3 $\pm$ 59.0$^{a}$ & 104\,881\,052 \\
-1\,KiB overwrite & 88.5 $\pm$ 17.3 & 104\,857\,600 & 5.2 $\pm$ 10.9$^{b}$ & 75\,667 \\
-1\,KiB insert at 0 & 87.8 $\pm$ 33.4 & 104\,858\,624 & 0.30 $\pm$ 0.41$^{b}$ & 66\,594 \\
-\end{reptable}
-{\footnotesize $^{a}$\,Same night as FTP. $^{b}$\,From Table~\ref{tab:experiments}; compare bytes only.\par}
 % FTP: analyze.py on data/ftp (full 106.5 +- 32.53, loss 248.9 +- 56.16, overwrite 88.5 +- 17.28,
 % insert 87.83 +- 33.42). Same night: clean 162.8 +- 14.03, loss 346.3 +- 59.04.
 % 104,857,600/75,667 = 1,386; 104,858,624/66,594 = 1,575; 248.9/106.5 = 2.3; 346.3/162.8 = 2.1.
 
-After a 1\,KiB edit FTP sends the whole file again: 1\,386 to 1\,575 times what meshsync sends
-(Figure~\ref{fig:ftp-bytes}).
-
-\begin{figure}[!htbp]\centering
-  \fitgraphic[0.25\textheight]{ftp-bytes.pdf}
-  \caption{Bytes received after a 1\,KiB edit: FTP vs meshsync (log scale, n = 5).}
-  \label{fig:ftp-bytes}
-\end{figure}
- For a
-fresh full copy, FTP was faster (106.5 vs 162.8\,s): one plain stream, with no chunking, hashing or
-per-chunk requests. Loss slowed both about equally (2.3 and 2.1 times). So meshsync wins after
-edits, not in raw bulk speed.
+After a 1\,KiB edit FTP sends the whole 104.9\,MB file again, 1\,386 to 1\,575 times what meshsync
+sends (Figure~\ref{fig:ftp-bytes}), taking $88.5 \pm 17.3$\,s where meshsync takes seconds. For a
+fresh full copy FTP was faster on the same night ($106.5 \pm 32.5$ vs $162.8 \pm 14.0$\,s): one plain
+stream, with no chunking, hashing or per-chunk requests. 5\,\% loss slowed both about equally
+($248.9 \pm 56.2$ and $346.3 \pm 59.0$\,s: 2.3 and 2.1 times). So meshsync wins after edits, not in
+raw bulk speed.

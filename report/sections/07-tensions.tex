@@ -26,9 +26,3 @@ messages. \emph{Defence:} the binary header is cheap. It is 12 of 154 bytes in a
 1\,KiB edit, the index entry listing every chunk hash was more than half of the 172\,KB sent. That
 still beats a full copy by 600 times, and it keeps messages readable and easy to dissect.
 % savings.md: delta all bytes 171,836, chunk 75,667; 105,183,306 / 171,836 = 612.
-
-\textbf{Connection reuse vs resources.} \emph{Position:} keep one connection open to every peer.
-\emph{Defence:} a new connection needs 5 round trips before it is usable, or 6 with TLS, against 1
-on an open one. With our RTTs that is about 46\,ms instead of 9\,ms to defalt, and 340\,ms instead of
-68\,ms to minipc. These are estimates from measured RTTs, not a separate test. With three peers we
-hold only three connections, so reuse is clearly worth it.

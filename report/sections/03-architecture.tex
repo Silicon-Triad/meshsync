@@ -3,14 +3,13 @@
 % Sources: data/deploy/README.md and data/deploy/<host>/{host.txt,plain.log,tls.log} (session of
 % 2026-11-12, main at 79854e6, #67/#78); ports from constants.py. minipc's system hostname is
 % "Debian" (host.txt). No MAC addresses; config: log lines not quoted (home paths).
-\newpage
 \section{System and deployment architecture (R3)}
 \label{sec:architecture}
 
 We ran meshsync on three separate Linux machines on one Wi-Fi LAN, 192.168.100.0/24, with the
 router at 192.168.100.1 (Figure~\ref{fig:network}, Table~\ref{tab:ip-plan}), the network we will demonstrate on.
 
-\begin{figure}[!htbp]\centering
+\begin{figure}[H]\centering
   \input{../docs/diagrams/network-g2.tex}
   \caption{Network diagram. Dashed: Wi-Fi links; arrows: the three TCP connections, from the side
   that dialled.}
@@ -43,14 +42,9 @@ defalt: inet 192.168.100.80/24 brd 192.168.100.255 ... wlp4s0
 \end{verbatim}
 % data/deploy/<host>/host.txt ("## ip -4 addr"), host name prefixed, flags shortened to "...".
 
-\textbf{Run.} Each host ran \code{meshsync run}, first with \code{--plain} and then with
-\code{--tls}, with no static peers, so UDP discovery found every connection. All three links reached
-SYNCED in both modes, for example on minipc:
-\begin{verbatim}
-20:27:29,272 ...auth: initiator handshake ok with defalt (BDB9C75B)
-20:27:29,273 ...manager: peer up: defalt 192.168.100.80:47001 (plain)
-20:27:29,285 ...connection: connection to defalt is SYNCED
-\end{verbatim}
-Creates, edits and deletes reached every host, in both modes.
+\textbf{Run.} Each host ran \code{meshsync run}, first in plain mode and then with TLS, with no
+static peers, so UDP discovery found every connection. All three links reached SYNCED in both modes
+(\code{handshake ok \ldots{} SYNCED} in every host's log), and creates, edits and deletes reached
+every host.
 % data/deploy/minipc/plain.log (lines quoted, prefixes shortened); data/deploy/README.md
 % ("What was checked", checks 2-9). Raw evidence: data/deploy/; TLS CA made on kratos.

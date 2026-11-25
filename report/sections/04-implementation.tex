@@ -35,8 +35,8 @@ over TCP. Table~\ref{tab:transport} justifies both choices.
 \endhead
 \bottomrule
 \endlastfoot
-Reliable transfer & Not needed: a lost ANNOUNCE is replaced 5\,s later. \emph{With TCP:} we would need the peer's address before we could connect, and finding it is discovery's job. & Needed: chunks must arrive whole and in order. \emph{With UDP:} we would rebuild sequence numbers, ACKs and retransmission, and split each 256\,KiB chunk over many datagrams. \\
-Throughput & Tiny: one datagram of at most 512 bytes every 5\,s. \emph{With TCP:} a connection per pair just to say ``I am here''. & Bulk data needs congestion and flow control. \emph{With UDP:} we would write our own, or flood the shared Wi-Fi. \\
+Reliable transfer & Not needed: a lost ANNOUNCE is replaced 5\,s later. \emph{With TCP:} we must know the peer's address before connecting; finding it is discovery's job. & Needed: chunks must arrive whole and in order. \emph{With UDP:} we would rebuild sequencing, ACKs and retransmission. \\
+Throughput & Tiny: $\le$\,512 bytes every 5\,s. \emph{With TCP:} a connection per pair just to say ``I am here''. & Bulk data needs congestion control. \emph{With UDP:} we would write our own, or flood the Wi-Fi. \\
 Timing & One broadcast reaches all peers at once. \emph{With TCP:} a separate setup to every peer, and no broadcast. & Sync works in seconds, so retransmission delay is fine. \emph{With UDP:} lower latency we do not need. \\
 Security & TLS needs a connection, so each datagram carries an HMAC tag and timestamp. & The HMAC handshake and TLS~1.3 both run over the TCP stream. \emph{With UDP:} TLS could not be used as is. \\
 \end{reptable}

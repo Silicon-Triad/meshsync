@@ -16,17 +16,11 @@ written directly on sockets. Peers find each other by UDP broadcast and use TCP 
 We did not measure how distribution time grows with the number of receivers. Instead,
 Section~\ref{sec:ftp} compares meshsync with FTP, a client-server protocol, on the same hosts.
 
-Each main feature fixes a gap in an existing protocol:
-\begin{itemize}\itemsep0pt
-  \item \textbf{Delta sync.} Only changed chunks travel, each checked by SHA-256. FTP resends the
-        whole file. Content-defined chunking keeps this true after an insert, where fixed-size
-        blocks would all shift.
-  \item \textbf{One connection, any order.} A request ID lets replies arrive out of order on one
-        TCP connection. HTTP/1.1 must answer in order.
-  \item \textbf{Many peers, always in sync.} rsync links two hosts, once.
-  \item \textbf{Authentication.} An HMAC handshake proves the shared secret without sending it, and
-        discovery messages are tagged. FTP sends the password in clear, and mDNS can be spoofed.
-\end{itemize}
+Each main feature fixes a gap in an existing protocol. Only changed chunks travel, where FTP
+resends the whole file, and content-defined chunking keeps this true after an insert. A request ID
+lets replies arrive in any order on one connection, unlike HTTP/1.1. Many peers stay in sync
+continuously, where rsync links two hosts once. An HMAC handshake proves the shared secret without
+sending it, where FTP sends the password in clear.
 
 \paragraph{Approved deviations.} From our approved proposal, quoted verbatim:
 
