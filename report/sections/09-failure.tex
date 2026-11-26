@@ -1,9 +1,40 @@
 % !TEX root = ../main.tex
-% Section 9. Suggested page budget: 0.75 page (suggestion only).
-% Filled by: #75 (R7). Sources: PROJECT_CONTEXT.md §10, tests/integration/test_failures.py
-% (#63), data/captures/README.md (R7 evidence, #68).
+% Section 9. Page budget: about 0.75 page (trimming pass, 2026-11-24).
+% Sources: PROJECT_CONTEXT.md §10; data/captures/README.md and cap2-cap5 + logs (#68), counted with
+% tshark 4.2.2 and tools/wireshark/meshsync.lua; tests/integration/ (#62, #63). Log times are
+% defalt's (UTC); kratos logs are 5 h ahead.
+% cap4: FIN frame 48679 (90.99 s) from defalt, 421 RSTs before 92 s; kratos log 18:58:54 (13:58:54
+% UTC) "peer down: defalt ... peer closed connection"; dial refused (RST) frames 49212, 49215;
+% HELLO frame 49223 (117.8 s); defalt log 13:59:21 "fetching large.bin: 633 of 1403 chunks",
+% 13:59:55 "assembled large.bin (104857600 bytes, 1403 chunks)".
+% cap2: 14 datagrams, 0 TCP frames, defalt "bad tag" every 5 s. cap2b: frames 6/8/10/11/12, four
+% attempts; defalt log 13:41:33 "initiator handshake failed: AUTH_FAILED: bad mac_r".
+% cap3 alerts in frames 14/27/40/53. cap5: retransmission 402, fast 52, dup ACK 715, 12,417 frames.
 \section{Behaviour under failure (R7)}
 \label{sec:failure}
 
-\TODO{filled by \#75: designed behaviour for each failure scenario, with log and capture
-evidence.}
+\textbf{Peer killed mid-transfer.} \emph{Designed:} the transfer \textbf{survives} and the file completes.
+\emph{Result:} we killed defalt (\code{kill -9}) while it received the 100\,MiB file from
+kratos. Its kernel closed the link at once (FIN, frame 48679) and kratos logged \code{peer down}. After the
+restart (handshake, frame 49223) defalt fetched \textbf{633 of 1403} chunks, keeping the \textbf{770} it
+had, and the file assembled correctly.
+
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.25\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.22\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.53\linewidth-2\tabcolsep\relax}}
+\caption{Other failure scenarios (frames from our captures).}\label{tab:failures}\\
+\toprule
+\colhead{Scenario} & \colhead{Designed behaviour} & \colhead{Evidence} \\
+\midrule
+\endfirsthead
+\multicolumn{3}{@{}l}{\tablecontinued}\\
+\toprule
+\colhead{Scenario} & \colhead{Designed behaviour} & \colhead{Evidence} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+Wrong secret, spoofed or replayed & Dropped; ERROR 0x04 & \code{cap2}: ANNOUNCEs dropped, no TCP; static peer (\code{cap2b}): \code{AUTH\_FAILED} (frame 10). \\
+Untrusted certificate & TLS alert, close & \code{cap3}: alert \emph{Unknown CA} (frame 14); no meshsync message. \\
+5\,\% packet loss & Completes, slower & \code{cap5}: \textbf{402 of 7\,935} segments resent (5.1\,\%), 715 dup ACKs; file intact. \\
+Concurrent edits; offline rejoin & Conflict copy; index catch-up & Localhost tests in CI only (\code{tests/integration}). \\
+Corrupt chunk & Re-request from another peer & Designed, not yet tested. \\
+\end{reptable}

@@ -11,13 +11,15 @@ Rules: [`AGENTS.md`](../AGENTS.md).
 
 | Path | Content |
 | ---- | ------- |
-| `main.tex` | Rubric title page, section order, page-count check |
-| `preamble.tex` | Fonts, layout, headings, header/footer, links and macros (style of our CS-326 SRS) |
+| `main.tex` | Rubric title page, table of contents, opening block, section order, page-count check |
+| `project.tex` | The only file with project strings: header, footer, opening-block text, switches (latex-report skill) |
+| `preamble.tex` | Fonts, layout, headings, header/footer, TOC style, links and macros |
 | `sections/00-rubric-placeholder.tex` | Shown only while `rubric.pdf` is missing |
 | `sections/01-…10-*.tex` | One file per counted section, in the order the brief requires |
 | `sections/11-references.tex` | References (not counted) |
-| `appendices/code.tex` | Code appendix: repo link and commit hash (not counted) |
-| `appendices/ai-use.tex` | AI-use declaration, from `docs/AI_USE_LOG.md` |
+| `appendices/A_run_guide.tex` | Appendix A: quick guide to running meshsync (not counted) |
+| `appendices/B_code.tex` | Appendix B, code: repo link and commit hash (not counted) |
+| `appendices/C_ai-use.tex` | Appendix C, AI-use declaration: summary of `docs/AI_USE_LOG.md` by area of work (last) |
 | `figures/` | Figures made for the report (diagrams also load from `docs/diagrams/`, graphs from `analysis/out/`) |
 | `rubric.pdf` | The filled-in rubric; **not committed** (gitignored), we attach it ourselves |
 
@@ -42,17 +44,18 @@ and its suggested page budget. Unfilled content is marked `\TODO{...}` and shows
 
 How `main.tex` and `preamble.tex` enforce them:
 
-- **Fonts:** with Tectonic/XeLaTeX/LuaLaTeX, `fontspec` loads TeX Gyre Termes (a Times clone)
-  by file name. For real Times New Roman, install the font files (Arch: `ttf-ms-fonts`) and set
-  `\realtimestrue` in `main.tex` (`\timesfontpath` gives their folder). Fonts are never looked
-  up by name: that makes Tectonic scan all system fonts, and one bad font crashes it.
-  With pdfLaTeX (Overleaf), `newtxtext` (a Times clone).
-  `12pt` class option for the body; `titlesec` sets section headings to 14 pt; subsections
-  stay 12 pt bold.
-- **Page limit:** the rubric pages are unnumbered; numbering starts at 1 on the Introduction.
-  After section 10 the build log prints `BODY PAGES: N (limit 10)` and warns if N > 10.
-  References and appendices start on a new page after that point.
-- **Not set by the brief text we have:** paper size (A4) and margins (1 in, as in the SRS) are assumptions;
+- **Fonts:** Times New Roman, loaded by file name (never by family name: that makes Tectonic scan
+  all system fonts, and one bad font crashes it). `preamble.tex` looks for lowercase `times.ttf`,
+  `timesbd.ttf`, `timesi.ttf`, `timesbi.ttf` in `report/fonts/` (gitignored), then in
+  `/usr/share/fonts/TTF/` (Arch: `ttf-ms-fonts`), and stops with an error if they are missing.
+  With pdfLaTeX (Overleaf), `newtxtext` (a Times clone). `12pt` class option for the body;
+  `titlesec` sets section headings to 14 pt; subsections stay 12 pt bold.
+- **Page limit:** the rubric page is unnumbered; numbering starts at 1 on the table of contents.
+  The footer reads `x of N`, where N excludes the rubric. The table of contents is not counted:
+  after section 10 the build log prints `BODY PAGES: N (limit 10)` (first page of the opening
+  block/section 1 to the end of section 10) and warns if N > 10. References and appendices
+  start on a new page after that point.
+- **Not set by the brief text we have:** paper size (A4) and margins (2.2 cm, as in the latex-report skill) are assumptions;
   confirm against the brief before submission.
 
 ## Page budget (suggestion only)
@@ -100,12 +103,12 @@ fancyhdr, url, hyperref, tikz (libraries arrows.meta, positioning).
 
 ## Style and macros (`preamble.tex`)
 
-Same look as our CS-326 SRS: 1 in margins, no paragraph indent with a small gap between
-paragraphs, bold caption labels, a grey running header (`meshsync -- CS-327 CEP report` /
-`Group G2`), coloured links. Differences from the SRS, because the brief fixes them: Times
-New Roman instead of Latin Modern, 12 pt body instead of 11 pt, 14 pt section headings,
-body-size captions and tables, and no table of contents or lists of figures/tables (they would
-use pages from the 10-page budget).
+House style of the latex-report skill (`references/style.md`): 2.2 cm margins, no paragraph indent
+with a small gap between paragraphs, bold caption labels, a two-line header on each side (text in
+`project.tex`: NED University / department at left, CEP / CS-327 at right), footer `CS-240-`,
+`x of N`, `-39, -45, -47`, no header rule, plain (uncoloured) links. The brief fixes Times New
+Roman, a 12 pt body and 14 pt section headings. The table of contents is page 1 of the numbering
+and is not counted in the 10 pages.
 
 | Macro | Use |
 | ----- | --- |
@@ -120,10 +123,24 @@ Build outputs (PDF, aux, log, …) are gitignored; never commit them.
 
 ## Updating the AI-use appendix
 
-`appendices/ai-use.tex` has one row per row of `docs/AI_USE_LOG.md`. Empty or placeholder
-cells in the log appear as `TODO`: fix them in the log (the member who did the work), then
-update the matching row here. Rows added to the log later (for example #74, #75) must be added
-here before submission.
+`appendices/C_ai-use.tex` summarises `docs/AI_USE_LOG.md` by area of work (one row per area, with
+issues, members, tool and model); the complete log stays in the repository and the appendix
+points to it. It is written by hand: when the log gains entries, update the issue lists, the
+entry count and the model note. Empty or placeholder cells in the log must be fixed in the log
+itself (the member who did the work).
+
+## Regenerating the report graphs
+
+`figures/throughput-ceiling.pdf` and `figures/ftp-bytes.pdf` come from
+`report/figures/make_figures.py` (uses `analysis/analyze.py`'s statistics on `data/`,
+`data/ftp/` and `data/baseline/summary.csv`; needs `pip install -e .[analysis]`):
+
+```bash
+report/figures/make_figures.py
+```
+
+`figures/exp-impaired.pdf` is a copy of `analysis/out/impaired.pdf` (`analysis/analyze.py`).
+The diagrams are TikZ in `docs/diagrams/` (network, protocol setup and states, encapsulation).
 
 ## Submission checklist
 

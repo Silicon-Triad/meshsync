@@ -1,0 +1,28 @@
+% UDP discovery (R1): sending, receive checks in order, peer table, dial rule. TikZ fragment,
+% \input by report/sections/02-protocol.tex. Source: docs/PROTOCOL.md §3.1-§3.5 (datagram, tag,
+% receive rules, timers), §8.1 (dial rule); constants.py UDP_PORT 47000, TCP_PORT 47001,
+% MAX_DATAGRAM 512, ANNOUNCE_INTERVAL 5, ANNOUNCE_MAX_SKEW 30, PEER_EXPIRY 15.
+\begin{tikzpicture}[font=\footnotesize, >={Stealth[length=1.8mm]},
+    box/.style={draw, rounded corners=2pt, align=center, inner sep=3pt},
+    chk/.style={box, fill=black!5, minimum height=12mm, text width=17mm},
+    drop/.style={->, gray}]
+  % sender
+  \node[box, text width=30mm] (snd) at (0,0)
+    {\textbf{Sender}, every 5\,s:\\ANNOUNCE (LEAVE at exit)\\$\le$\,512\,B, \texttt{tag} = HMAC$_K$};
+  % receiver checks, in order
+  \node[chk] (c1) at (4.0,0) {1. size, JSON,\\9 fields};
+  \node[chk, right=3mm of c1] (c2) {2. not my own\\\texttt{peer\_id}};
+  \node[chk, right=3mm of c2] (c3) {3. tag\\correct};
+  \node[chk, right=3mm of c3] (c4) {4. \texttt{ts} within\\30\,s};
+  \node[chk, right=3mm of c4] (c5) {5. \texttt{ts} newer\\than last};
+  \draw[->, thick] (snd) -- node[above, font=\scriptsize] {UDP 47000} node[below, font=\scriptsize] {broadcast} (c1);
+  \foreach \a/\b in {c1/c2, c2/c3, c3/c4, c4/c5} \draw[->] (\a) -- (\b);
+  \foreach \c in {c1, c2, c3, c4, c5} {
+    \draw[drop] (\c.south) -- ++(0,-0.45) node[below, inner sep=1pt] {drop};
+  }
+  % peer table and dial
+  \node[box, below=9mm of c5.south east, anchor=north east, text width=30mm] (tab) {Peer table: add or update\\(LEAVE: remove);\\silent 15\,s: expire};
+  \node[box, left=8mm of tab, text width=38mm] (dial) {Lower \texttt{peer\_id} dials\\TCP 47001 at the\\datagram's source IP};
+  \draw[->] (c5.east) -- ++(0.3,0) |- (tab.east);
+  \draw[->] (tab) -- (dial);
+\end{tikzpicture}

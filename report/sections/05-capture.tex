@@ -1,10 +1,38 @@
 % !TEX root = ../main.tex
-% Section 5. Suggested page budget: 1 page (suggestion only).
-% Filled by: #75 (R5). Source: data/captures/README.md (#68, annotated packets, overhead).
+% Section 5. Page budget: about 1 page (trimming pass, 2026-11-24).
+% Filled by #75 stage 1 (R5). Sources: data/captures/README.md (#68) and data/captures/cap1.pcapng.gz,
+% decoded with tshark 4.2.2 and tools/wireshark/meshsync.lua (#87). Every value below was
+% read from the capture with tshark (cap1 frame 317 unless stated). MACs in the capture are
+% anonymised (scripts/measure/anon_mac.py).
+\newpage
 \section{Packet capture and encapsulation analysis (R5)}
 \label{sec:capture}
 
-\TODO{filled by \#75: annotated capture, each layer related to the Lecture 03 encapsulation
-model.}
+\textbf{Method.} We captured a \textbf{plain-mode} sync of a 100\,MiB file from kratos to defalt with
+\code{tshark} (first 256 bytes per frame; plain mode is our approved R5 deviation, as TLS would hide
+our messages; MACs anonymised). Our Wireshark dissector decodes the meshsync header as its own layer. Figure~\ref{fig:capture} shows one CHUNK\_REQ from defalt.
+% tshark -s 256 -f "udp port 47000 or tcp port 47001" on wlp2s0; data/captures/README.md ("How
+% they were taken", "Privacy"); tools/wireshark/README.md (D5).
+% Figure: Wireshark screenshots by Ahmed (2026-11-25), selected detail lines stacked and
+% annotated per layer (layout only; no values changed).
 
-\placeholderfigure{filled by \#75: annotated packet (data/captures/)}{Annotated packet capture, layer by layer.}{fig:capture}
+\begin{figure}[H]\centering
+  \IfFileExists{figures/capture-chunkreq.png}{\includegraphics[width=0.88\linewidth]{capture-chunkreq.png}}%
+    {\fbox{\parbox[c][4cm][c]{0.9\linewidth}{\centering\TODO{Wireshark screenshot of cap1 frame 317}}}}
+  \caption{One CHUNK\_REQ in Wireshark with our dissector (capture \code{cap1}, frame 317), annotated by
+  layer. Selected lines of each header are shown; the red box marks our 12-byte header in the packet
+  bytes.}
+  \label{fig:capture}
+\end{figure}
+
+Each layer adds what the one above lacks: the link header delivers the frame across the Wi-Fi
+LAN, IP addresses the other host, TCP reaches our process by port with a reliable, ordered stream,
+and our header marks each message's boundary, type and request ID.
+% cap1 frame 317: eth.dst/src/type, ip.src/dst/len/ttl/proto/flags.df, tcp.srcport/dstport/seq/
+% ack/flags/window_size_value (scale 128)/options, meshsync.* (tshark -V with meshsync.lua).
+
+\textbf{Encapsulation and overhead.} On kratos each header is read and removed by its own layer:
+the frame by the network card, IP and TCP by the kernel, and our header by meshsync. In this frame \textbf{78 of 154 bytes} are headers, only \textbf{12} ours. Over the
+whole 100\,MiB transfer our messages added \textbf{0.21\,\%} and all headers \textbf{5.98\,\%}.
+% cap1 frame 225: frame.len 1514, tcp.len 1448, CHUNK_DATA body_len 65558. Whole transfer:
+% data/captures/README.md ("Header and body overhead").

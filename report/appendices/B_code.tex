@@ -1,0 +1,92 @@
+% !TEX root = ../main.tex
+% Code appendix: not counted in the page limit. Descriptions from each folder's README.md and
+% each file's module docstring or header comment (git ls-files, 2026-11-25).
+\section{Code}
+\label{app:code}
+
+Repository: \url{https://github.com/Silicon-Triad/meshsync}
+
+
+\subsection{Repository layout}
+\begin{verbatim}
+meshsync/
+|-- .github/workflows/   CI: ruff and pytest on Python 3.11 and 3.12
+|-- analysis/            Tables and graphs from the measurement CSVs
+|-- data/                Measured results, one folder per experiment
+|   |-- baseline/        ping, PING/PONG and iperf3 between every host pair
+|   |-- captures/        Wireshark captures (MACs replaced) and decodes
+|   |-- deploy/          Three-host deployment logs and host details
+|   |-- ftp/             FTP baseline and the same-night meshsync rerun
+|   `-- full_delta/ ...  One folder per experiment (fixed_cdc, impaired,
+|                        sources, tls): one CSV per run
+|-- docs/                Project context, protocol spec, AI use log
+|   |-- diagrams/        TikZ diagrams used in the report
+|   `-- setup/           GitHub setup guide
+|-- report/              This report (LaTeX): sections, appendices, figures
+|-- scripts/             Certificates, test data, netem, local mesh, checks
+|   `-- measure/         Experiment runners, baseline and FTP scripts
+|-- src/meshsync/        The program (standard library only)
+|   |-- protocol/        Constants, framing, message bodies
+|   |-- net/             Discovery, connections, peer manager, auth, TLS
+|   |-- sync/            Chunking, index, store, scanner, version vectors
+|   |-- transfer/        Multi-source scheduler, file assembly
+|   `-- metrics/         Per-message metrics log
+|-- tests/               unit/ and integration/ (pytest)
+|-- tools/wireshark/     Lua dissector for our protocol
+|-- AGENTS.md            Rulebook for humans and AI agents
+`-- pyproject.toml       Package metadata, ruff and pytest settings
+\end{verbatim}
+
+\subsection{Main code files}
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.44\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.56\linewidth-2\tabcolsep\relax}}
+\caption{Main code files.}\label{tab:code-files}\\
+\toprule
+\colhead{File} & \colhead{Description} \\
+\midrule
+\endfirsthead
+\multicolumn{2}{@{}l}{\tablecontinued}\\
+\toprule
+\colhead{File} & \colhead{Description} \\
+\midrule
+\endhead
+\bottomrule
+\endlastfoot
+\multicolumn{2}{@{}l}{\textit{Program (\code{src/meshsync/})}}\\
+\code{\_\_main\_\_.py} & CLI entry point: \code{meshsync run}, \code{status}, \code{stats} \\
+\code{config.py} & Configuration from CLI arguments and the config file \\
+\code{node.py} & Wires the peer manager to the sync and transfer components \\
+\code{status.py} & Status file and transfer statistics for \code{status} and \code{stats} \\
+\code{protocol/constants.py} & Ports, limits, timers, message types and error codes \\
+\code{protocol/framing.py} & TCP framing: the 12-byte header plus body \\
+\code{protocol/messages.py} & Message body codecs and validators \\
+\code{net/discovery.py} & UDP discovery: ANNOUNCE/LEAVE broadcast and the peer table \\
+\code{net/auth.py} & HMAC-SHA256 challenge-response handshake \\
+\code{net/tls.py} & TLS 1.3 mutual-authentication contexts and socket wrapping \\
+\code{net/connection.py} & One authenticated TCP link to one peer: reader thread, requests by REQ\_ID \\
+\code{net/manager.py} & Peer manager: dialling, accept loop, liveness and reconnect \\
+\code{sync/chunker.py} & Content-defined (Gear/FastCDC) and fixed-size chunking \\
+\code{sync/store.py} & Content-addressed chunk store \\
+\code{sync/index.py} & Local file index \\
+\code{sync/scanner.py} & Polling change detection \\
+\code{sync/vclock.py} & Version vector operations \\
+\code{sync/engine.py} & Sync engine: compares entries, handles conflicts and tombstones \\
+\code{transfer/scheduler.py} & Multi-source chunk scheduler \\
+\code{transfer/assembler.py} & File assembly from verified chunks \\
+\code{metrics/logger.py} & Per-message metrics: CSV and human-readable log \\
+\multicolumn{2}{@{}l}{\textit{Scripts and tools}}\\
+\code{scripts/check.sh} & Runs locally what CI runs, plus a shell syntax check \\
+\code{scripts/gen\_certs.sh} & Generates the group CA and per-peer TLS certificates \\
+\code{scripts/gen\_testdata.py} & Generates the measurement test data set \\
+\code{scripts/netem.sh} & Applies and clears \code{tc netem} delay and loss profiles \\
+\code{scripts/run\_local\_mesh.sh} & Starts several peers on one machine for local testing \\
+\code{scripts/measure/run.py} & Experiment runner on one host \\
+\code{scripts/measure/hosts.py} & Runs the experiments across separate hosts \\
+\code{scripts/measure/peer.py} & Runs one peer with the metrics CSV switched on \\
+\code{scripts/measure/baseline.\{sh,py\}} & Network baseline (ping, iperf3) and its summary \\
+\code{scripts/measure/ftp\_baseline.py} & FTP baseline on the same hosts \\
+\code{scripts/measure/anon\_mac.py} & Replaces MAC addresses in a capture before commit \\
+\code{analysis/analyze.py} & Tables and graphs from the measurement CSVs \\
+\code{report/figures/make\_figures.py} & Report graphs that combine several experiments \\
+\code{tools/wireshark/meshsync.lua} & Wireshark dissector for our protocol \\
+\code{tools/wireshark/decode.sh} & Decodes a capture with the dissector, counts message types \\
+\end{reptable}

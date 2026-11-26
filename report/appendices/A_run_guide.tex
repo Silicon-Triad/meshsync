@@ -1,0 +1,58 @@
+% !TEX root = ../main.tex
+% Appendix A: quick guide to running meshsync. Commands: AGENTS.md §3, PROJECT_CONTEXT.md §14,
+% scripts/run_local_mesh.sh, scripts/gen_certs.sh. The status output in "What you should see" is
+% copied from a real run of scripts/run_local_mesh.sh -n 3 (2026-11-24); the folder path differs.
+% Trimmed to one page on 2026-11-24 (Files table dropped; Linux-only disclaimer added).
+\section[\texorpdfstring{\protect\fbox{\strut Quick Guide: Running meshsync}\protect\hspace{6pt}%
+ \protect\colorbox{black}{\protect\color{white}\protect\bfseries\ START HERE\ }}{Quick Guide: Running meshsync}]{Quick Guide: Running meshsync}
+\label{app:run}
+
+meshsync runs on Linux with Python 3.11 or newer and needs no package beyond the standard library.
+\textbf{The whole project was built and tested on Linux machines only;} we have not tried it on
+Windows or macOS. Run all commands from the repository root (Appendix~\ref{app:code}), after
+installing:
+\begin{Verbatim}[frame=single,fontsize=\small]
+python -m venv .venv && . .venv/bin/activate && pip install -e .[dev]
+\end{Verbatim}
+
+\subsection{One machine, three peers}
+\begin{Verbatim}[frame=single,fontsize=\small]
+scripts/run_local_mesh.sh -n 3
+\end{Verbatim}
+Add \code{--tls} for TLS 1.3; Ctrl-C stops all peers. Each peer gets its own folder,
+\code{.localmesh/\allowbreak peerN/data}, and TCP port 4700N; all share UDP discovery port 47000. In a second
+terminal, with the virtual environment active, put a file in one folder and ask another peer:
+\begin{Verbatim}[frame=single,fontsize=\small]
+echo hello > .localmesh/peer1/data/hello.txt
+meshsync status --dir .localmesh/peer2/data
+\end{Verbatim}
+
+\subsection{Three laptops}
+The hosts must be on one subnet, and the firewall must allow UDP 47000 and TCP 4700x. Make the
+secret and the certificates once and copy them to every laptop (keep the key private); then start
+each laptop with its own \code{--name}:
+\begin{Verbatim}[frame=single,fontsize=\small]
+mkdir -p ~/.meshsync ~/MeshSync
+python -c 'import secrets; print(secrets.token_hex(32))' > ~/.meshsync/key
+chmod 600 ~/.meshsync/key
+scripts/gen_certs.sh ~/.meshsync/certs ahmed mujtaba huzaifa
+meshsync run --dir ~/MeshSync --name ahmed --secret-file ~/.meshsync/key \
+    --tls --cert-dir ~/.meshsync/certs
+\end{Verbatim}
+Use \code{--plain} instead of \code{--tls} to run without TLS. If broadcast is blocked, add
+\code{--peer HOST:PORT} for each other laptop.
+
+\subsection{What you should see}
+\nopagebreak\code{meshsync status} on peer2, a few seconds later (real output):
+\begin{Verbatim}[frame=single,fontsize=\small]
+running
+node     peer2 (7F44DFAD), plain, tcp 47002, udp 47000, pid 22653
+started  2026-11-24 19:51:15
+updated  2026-11-24 19:51:25 (1s ago)
+index    rev 1, 1 files, 0 tombstones
+peers    2
+  NAME   PEER_ID   ADDRESS              STATE   LAST SEEN
+  peer3  7E49D2F1  10.176.187.28:47003  SYNCED  11s ago
+  peer1  AB2DB2AD  127.0.0.1:47001      SYNCED  5s ago
+\end{Verbatim}
+\code{hello.txt} is now in all three \code{data} folders.

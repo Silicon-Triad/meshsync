@@ -1,93 +1,42 @@
 % !TEX root = ../main.tex
-% Section 3. Page budget: 1.25 pages (report/README.md, set by #74).
-% Filled by #74 (R3). Sources: data/deploy/README.md and data/deploy/<host>/{host.txt,
-% plain.log,tls.log} (3-host session of 2026-11-12, #67/#78); ports from
-% src/meshsync/protocol/constants.py. Hosts are named by their meshsync name; minipc's
-% hostname in host.txt is "Debian". No MAC addresses (not agreed by the team). The `config:`
-% log lines are not quoted: they contain home-directory paths.
+% Section 3. Page budget: about 1 page (trimming pass, 2026-11-24).
+% Sources: data/deploy/README.md and data/deploy/<host>/{host.txt,plain.log,tls.log} (session of
+% 2026-11-12, main at 79854e6, #67/#78); ports from constants.py. minipc's system hostname is
+% "Debian" (host.txt). No MAC addresses; config: log lines not quoted (home paths).
 \section{System and deployment architecture (R3)}
 \label{sec:architecture}
 
-Each host runs one meshsync peer: discovery and peer management, one connection object per peer
-(TCP socket, reader thread, send lock, REQ\_ID table), the sync engine with its index and chunk
-store, and the transfer scheduler. We deployed it on three independent Linux machines on one
-Wi-Fi LAN, 192.168.100.0/24 with gateway 192.168.100.1, the network we will demonstrate on
-(Figure~\ref{fig:network}, Table~\ref{tab:ip-plan}). The session ran on 12 November 2026 with
-\code{main} at commit \code{79854e6}; its raw evidence is in \code{data/deploy/} in the repository.
-% PROJECT_CONTEXT.md §8.2 (modules); data/deploy/README.md (network, date, commit).
+We ran meshsync on three separate Linux machines on one Wi-Fi LAN, 192.168.100.0/24, with the
+router at 192.168.100.1 (Figure~\ref{fig:network}, Table~\ref{tab:ip-plan}), the network we will demonstrate on.
 
-\begin{figure}[!htbp]\centering
-  \input{../docs/diagrams/network-g2.tex}
-  \caption{Network diagram of the three-host deployment. Dashed: Wi-Fi links; arrows: the
-  three TCP connections, from the side that dialled.}
+\begin{figure}[H]\centering
+  \scalebox{0.85}{\input{../docs/diagrams/network-g2.tex}}
+  \caption{Network diagram. Dashed: Wi-Fi links; arrows: the three TCP connections, from the side
+  that dialled.}
   \label{fig:network}
 \end{figure}
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.09\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.16\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.13\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.27\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.25\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.1\linewidth-2\tabcolsep\relax}}
-\caption{IP addressing plan. On every host meshsync listened on UDP 47000 and TCP 47001,
-both bound to \code{0.0.0.0}.}\label{tab:ip-plan}\\
+\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.15\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.17\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.24\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.2\linewidth-2\tabcolsep\relax}}
+\caption{IP plan and host configuration, as captured with \code{ip -4 addr} (all hosts listen on UDP 47000, TCP 47001).}\label{tab:ip-plan}\\
 \toprule
-\colhead{Host} & \colhead{Role (TCP)} & \colhead{Interface} & \colhead{IPv4 / prefix} & \colhead{OS (kernel)} & \colhead{Python} \\
+\colhead{Host} & \colhead{TCP role} & \colhead{Address (iface)} & \colhead{OS, Python} & \colhead{Firewall} \\
 \midrule
 \endfirsthead
-\multicolumn{6}{@{}l}{\tablecontinued}\\
+\multicolumn{5}{@{}l}{\tablecontinued}\\
 \toprule
-\colhead{Host} & \colhead{Role (TCP)} & \colhead{Interface} & \colhead{IPv4 / prefix} & \colhead{OS (kernel)} & \colhead{Python} \\
+\colhead{Host} & \colhead{TCP role} & \colhead{Address (iface)} & \colhead{OS, Python} & \colhead{Firewall} \\
 \midrule
 \endhead
 \bottomrule
 \endlastfoot
-kratos & dials minipc and defalt & \code{wlp2s0} & 192.168.100.92/24 \newline (DHCP) & Omarchy 4.0.6 (Linux 7.2.8) & 3.14.8 \\
-minipc & accepts kratos, dials defalt & \code{wlp2s0} & 192.168.100.190/24 \newline (static) & Debian 13 trixie (Linux 6.12.113) & 3.13.5 \\
-defalt & accepts kratos and minipc & \code{wlp4s0} & 192.168.100.80/24 \newline (DHCP) & Ubuntu 20.04.6 LTS (Linux 5.15.0) & 3.11.18 \\
+kratos (laptop) & dials minipc, defalt & 192.168.100.92/24, DHCP (\code{wlp2s0}) & Omarchy 4.0.6, Linux 7.2.8; Python 3.14.8 & ufw: 47000, 47001 open \\
+minipc (mini PC) & accepts kratos, dials defalt & 192.168.100.190/24, static (\code{wlp2s0}) & Debian 13, Linux 6.12.113; Python 3.13.5 & accepts all \\
+defalt (laptop) & accepts both & 192.168.100.80/24, DHCP (\code{wlp4s0}) & Ubuntu 20.04.6, Linux 5.15.0; Python 3.11.18 & none \\
 \end{reptable}
-% data/deploy/README.md (hosts table); <host>/host.txt (ip -4 addr, ip route, ss output);
-% roles from the "initiator/responder handshake ok" lines in <host>/plain.log.
 
-\begin{reptable}{>{\raggedright\arraybackslash}p{\dimexpr0.12\linewidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr0.88\linewidth-2\tabcolsep\relax}}
-\caption{Configuration of each host.}\label{tab:host-config}\\
-\toprule
-\colhead{Host} & \colhead{Configuration} \\
-\midrule
-\endfirsthead
-\multicolumn{2}{@{}l}{\tablecontinued}\\
-\toprule
-\colhead{Host} & \colhead{Configuration} \\
-\midrule
-\endhead
-\bottomrule
-\endlastfoot
-kratos & Laptop. ufw active, default deny incoming; 47000/udp and 47001/tcp already allowed, so no change was needed. \\
-minipc & Mini PC (system hostname \code{Debian}). No ufw; nftables INPUT policy accept, no rule matching the meshsync ports. \\
-defalt & Laptop (Toshiba Tecra R950). ufw inactive, no nftables. Python 3.11 installed from the deadsnakes PPA (the system had 3.8.10; meshsync needs 3.11+). \\
-\end{reptable}
-% data/deploy/README.md ("Hosts and IP addressing plan", "Problems and fixes");
-% <host>/host.txt (## firewall).
-
-\textbf{Run configuration.} On each host we ran \code{meshsync run --plain --log-level INFO}, then
-\code{meshsync run --tls --log-level INFO}, with \code{tcp\_port=47001}, \code{udp\_port=47000},
-\code{chunking='cdc'} and no static peers (\code{peers=()}), so every connection was found by UDP
-discovery. For TLS, \code{scripts/gen\_certs.sh} made the group CA and certificates on kratos; each
-host received the CA certificate, its own certificate and key, and the secret over \code{scp}, and
-the CA key stayed on kratos. Excerpts from minipc's plain run and defalt's TLS run (date and
-logger prefixes shortened with ``\ldots''):
-% data/deploy/README.md ("Files", "Problems and fixes"); config values from the config: line
-% of each log (not quoted). Times from minipc/defalt; kratos logs are 5 h ahead (time zone).
-\begin{verbatim}
-20:27:23,339 ...auth: responder handshake ok with kratos (76F6CF68)
-20:27:23,354 ...connection: connection to kratos is SYNCED
-20:27:29,272 ...auth: initiator handshake ok with defalt (BDB9C75B)
-20:27:29,273 ...manager: peer up: defalt 192.168.100.80:47001 (plain)
-20:27:29,285 ...connection: connection to defalt is SYNCED
-20:33:22,446 ...manager: peer up: minipc 192.168.100.190:0 (tls)
-20:33:22,466 ...connection: connection to minipc is SYNCED
-20:33:22,473 ...manager: peer up: kratos 192.168.100.92:0 (tls)
-20:33:22,488 ...connection: connection to kratos is SYNCED
-\end{verbatim}
-On the accepting side the logged port is 0: that field holds the peer's listening port, which
-the acceptor does not know when the link comes up. All three links reached SYNCED in both modes. In the plain run, a file was created on minipc,
-edited on defalt and deleted on kratos, and each change reached the other two hosts; in the TLS
-run, a file created on defalt had the same SHA-256 on all three hosts.
-% data/deploy/minipc/plain.log, data/deploy/defalt/tls.log (lines quoted with prefixes
-% shortened); data/deploy/README.md ("What was checked", checks 4-9). Port 0:
-% src/meshsync/net/manager.py PeerInfo.tcp_port ("0 if it dialled us and was never discovered").
+\textbf{Run.} Each host ran \code{meshsync run}, first in plain mode and then with TLS, with no
+static peers, so UDP discovery found every connection. \textbf{All three links reached SYNCED} in both modes
+(\code{handshake ok \ldots{} SYNCED} in every host's log), and creates, edits and deletes reached
+every host.
+% data/deploy/minipc/plain.log (lines quoted, prefixes shortened); data/deploy/README.md
+% ("What was checked", checks 2-9). Raw evidence: data/deploy/; TLS CA made on kratos.

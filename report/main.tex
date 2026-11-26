@@ -1,23 +1,22 @@
 % CS-327 CEP report, group G2 (meshsync). Skeleton: issue #73. Content: #74, #75.
 % Owner: all members. Rules: AGENTS.md; formal requirements: report/README.md.
+% Layout: latex-report skill. Project strings (header, footer, opening block): project.tex.
 %
-% Builds with Tectonic / XeLaTeX / LuaLaTeX (fontspec) or pdfLaTeX (Overleaf).
-%   tectonic main.tex        or        latexmk -pdf main.tex
+% Build: tectonic main.tex   (then cp main.pdf CS24045.pdf; never commit PDFs)
 %
 % Formal requirements (course brief §9-§11 and rubric):
-%   - at most 10 pages, excluding the rubric title page, references and the code appendix;
-%     the build log prints "BODY PAGES: N (limit 10)" and warns when N > 10.
+%   - at most 10 pages for Sections 1-10; the rubric page, the table of contents, the references
+%     and the appendices are not counted. The build log prints "BODY PAGES: N (limit 10)".
 %   - Times New Roman, 12 pt body, 14 pt headings.
 %   - the filled-in grading rubric is the title page (no separate title page).
 %   - figures and tables labelled and numbered (\caption + \label).
-%
-% Packages, fonts, layout and macros: preamble.tex (style follows the team's CS-326 SRS).
 \documentclass[12pt,a4paper]{article}
+\input{project}
 \input{preamble}
 
 \begin{document}
 
-% ---- Title page: the course's grading rubric (no separate title page) -----------------
+% ---- Rubric = page 1 (the only title page; no \maketitle) -------------------------------
 % Put the filled-in rubric at report/rubric.pdf (gitignored: we attach it ourselves).
 \pagenumbering{gobble}
 \IfFileExists{rubric.pdf}{%
@@ -25,12 +24,18 @@
 }{%
   \input{sections/00-rubric-placeholder}%
 }
-
-% ---- Body: counted against the 10-page limit ------------------------------------------
 \clearpage
 \pagenumbering{arabic}
 
+% ---- Table of contents: first page of the numbering, not counted in the 10 pages ----------
+\ifShowTOC\tableofcontents\vspace{2pt}\newpage\fi
+
+% ---- Opening block, same page as Section 1 ----------------------------------------------
+\label{body-start}
+
+% ---- Body: Sections 1-10, counted against the 10-page limit -----------------------------
 \input{sections/01-introduction}
+\titlespacing*{\section}{0pt}{24pt}{4pt}% more space before every section from 2 on
 \input{sections/02-protocol}
 \input{sections/03-architecture}
 \input{sections/04-implementation}
@@ -43,19 +48,19 @@
 
 % End of the counted body: report the page count in the build log.
 \label{body-end}
-\typeout{BODY PAGES: \getpagerefnumber{body-end} (limit 10)}
-\ifnum\getpagerefnumber{body-end}>10
-  \GenericWarning{}{report: body is \getpagerefnumber{body-end} pages, over the 10-page limit}
+\newcounter{bodypages}
+\setcounter{bodypages}{\numexpr\getpagerefnumber{body-end}-\getpagerefnumber{body-start}+1\relax}
+\typeout{BODY PAGES: \thebodypages\space (limit 10)}
+\ifnum\value{bodypages}>10
+  \GenericWarning{}{report: body is \thebodypages\space pages, over the 10-page limit}
 \fi
 
-% ---- Not counted: references and appendices -------------------------------------------
-\clearpage
+% ---- Not counted: references and appendices ---------------------------------------------
 \input{sections/11-references}
 
 \appendix
-\clearpage
-\input{appendices/code}
-\clearpage
-\input{appendices/ai-use}
+\clearpage\input{appendices/A_run_guide}
+\clearpage\input{appendices/B_code}
+\input{appendices/C_ai-use}   % \DeclLasttrue: the AI-use declaration comes last
 
 \end{document}

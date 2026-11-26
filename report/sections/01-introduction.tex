@@ -1,14 +1,22 @@
 % !TEX root = ../main.tex
-% Section 1. Suggested page budget: 1 page (suggestion only; README.md has the full table).
-% Filled by: not assigned to #74/#75 yet (PROJECT_CONTEXT.md §3: "All": intro).
-% Sources: PROJECT_CONTEXT.md §1 (summary), §2 (requirements, deviations), §5 (improvements).
+% Section 1. Page budget: about 0.5 page (trimming pass, 2026-11-24).
+% Sources: PROJECT_CONTEXT.md §1 (summary), §2 (deviations), §5 (improvements); course brief §5
+% (Option E wording). D-numbers: D6 (pure P2P), D10 (CDC), D11 (tagged discovery).
+\vspace{0.6pt}
 \section{Introduction and the option selected}
 \label{sec:intro}
 
-\TODO{project summary and the option selected (team; PROJECT\_CONTEXT.md §1, §5).}
+meshsync keeps one shared folder identical on three Linux hosts, with no central server: every
+host is an equal peer, and a change on one reaches the others within seconds. We chose a custom
+option extending Option~E (file distribution): a peer-to-peer synchroniser with our own protocol on
+sockets, UDP broadcast for discovery and TCP for everything else. Instead of a scaling study,
+Section~\ref{sec:ftp} compares it with FTP, a client-server protocol, on the same hosts. Each
+feature fixes a gap in an existing protocol: only changed chunks travel, unlike FTP, even after an
+insert (content-defined chunking); request IDs allow out-of-order replies, unlike HTTP/1.1; many peers
+stay in sync continuously, unlike rsync; and an HMAC handshake never sends the secret, unlike FTP's
+clear-text password.
 
-\paragraph{Approved deviations.} The following deviations were stated in our proposal and
-approved (PROJECT\_CONTEXT.md §2, quoted verbatim):
+\paragraph{Approved deviations.} From our approved proposal, quoted verbatim:
 
 \begin{quote}
 Approved deviations (stated in proposal): custom option (extends Option E); R5 capture in plain
