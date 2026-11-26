@@ -17,31 +17,28 @@ repository (date, member, tool, purpose, what was kept or changed).
 \begin{itemize}
   \item \textbf{Project setup and rules:} repository scaffold, continuous integration, PR
     template, GitHub setup guide, folder READMEs and the \code{AGENTS.md} rulebook. The design
-    decisions D1--D15 and the requirement list in \code{PROJECT\_CONTEXT.md} were made by the team;
-    the AI only works from them and may not edit that file.
+    decisions D1--D15 and requirements in \code{PROJECT\_CONTEXT.md} are the team's; the AI may
+    not edit that file.
   \item \textbf{Code authoring:}
     \begin{itemize}
-      \item \emph{Manual authorship:} \TODO{team: name any modules or fixes written by hand.}
+      \item \emph{Manual authorship:} Lua plugin for Wireshark, code and script fixes for running tests, and program configuration changes.
       \item \emph{AI generated:} first drafts of the protocol and networking modules (framing,
         message validation, discovery, HMAC handshake, TLS, connections, peer manager, node, CLI),
         the sync modules (chunker, chunk store, index, scanner, version vectors, engine), the
         transfer and metrics modules, their unit and integration tests, the measurement and
         analysis scripts, and the Wireshark dissector. Each draft followed a plan the owning member
-        approved first, and was merged only through a pull request with CI and a review by another
-        member, who requested fixes where needed.
+        approved and was merged only by pull request, with CI and review by another member.
     \end{itemize}
   \item \textbf{Protocol specification:} consolidating \code{PROTOCOL.md} into one document, with
     worked examples generated from the code. Protocol values were copied from
     \code{PROJECT\_CONTEXT.md} and \code{constants.py}, never invented by the AI.
   \item \textbf{Measurement:} step-by-step commands for the three-host deployment, the captures,
     the baseline and the experiment batch, and the data READMEs written from the recorded results.
-    The members ran every measurement on their own machines; all numbers in this report come from
-    those runs.
+    The members ran every measurement themselves; all numbers come from those runs.
   \item \textbf{Report writing:}
     \begin{itemize}
       \item \emph{Manual editing:} the page style, header and footer, the Wireshark screenshots,
         the choice of the cited energy figure, and the report's structure and page budget.
-        \TODO{team: add any sections re-written by hand.}
       \item \emph{AI generated:} the LaTeX skeleton, the first drafts of Sections 1--10 and the
         appendices from our specification, data and captures, the diagrams and graphs, and the
         trimming passes that shortened the text and lowered its fog index.
